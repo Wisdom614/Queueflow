@@ -48,7 +48,7 @@ function JoinQueueForm() {
 
     try {
       const ticket = joinQueue(selectedServiceId, customerName, customerPhone);
-      router.push(`/ticket/${ticket.ticketNumber}`);
+      router.push(`/${organization.slug}/${facility.slug}/ticket/${ticket.ticketNumber}`);
     } catch {
       setError('Unable to issue ticket. Please try again.');
     }
@@ -57,7 +57,7 @@ function JoinQueueForm() {
   const handleLookup = (e: React.FormEvent) => {
     e.preventDefault();
     if (!existingTicketInput.trim()) return;
-    router.push(`/ticket/${existingTicketInput.trim().toUpperCase()}`);
+    router.push(`/${organization.slug}/${facility.slug}/ticket/${existingTicketInput.trim().toUpperCase()}`);
   };
 
   return (

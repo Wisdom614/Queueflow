@@ -84,9 +84,9 @@ export default function PublicDisplayPage() {
           {/* Left: Brand & Facility */}
           <div className="flex items-center gap-3 sm:gap-4">
             <Link
-              href="/"
+              href={`/${organization.slug}/${facility.slug}`}
               className="size-8 sm:size-9 bg-[#17201d] text-[#e9ff6a] border border-[#2d3833] hover:border-[#e9ff6a] font-mono font-bold text-sm grid place-items-center transition-colors"
-              title="Return to Main App"
+              title="Return to Facility Portal"
             >
               ←
             </Link>

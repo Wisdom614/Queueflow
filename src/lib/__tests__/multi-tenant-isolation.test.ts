@@ -205,4 +205,39 @@ describe('Multi-Tenant Isolation & Boundary Verification Tests', () => {
       expect(isServiceInFacility(serviceA_Fees, facilityB)).toBe(false);
     });
   });
+
+  describe('Contract 4: Dynamic Tenant Resolution & Preset Isolation', () => {
+    it('resolves unique organization and facility data for each tenant slug', async () => {
+      const { getDemoTenantData, getAllDemoOrganizations } = await import('../mock-data');
+
+      const ubData = getDemoTenantData('ubuea');
+      expect(ubData.organization.slug).toBe('ubuea');
+      expect(ubData.facility.slug).toBe('central-bursary');
+      expect(ubData.services.some((s) => s.codePrefix === 'B')).toBe(true);
+
+      const telecomData = getDemoTenantData('sample-telecom');
+      expect(telecomData.organization.slug).toBe('sample-telecom');
+      expect(telecomData.facility.slug).toBe('downtown');
+      expect(telecomData.services.some((s) => s.codePrefix === 'S')).toBe(true);
+
+      const clinicData = getDemoTenantData('sample-clinic');
+      expect(clinicData.organization.slug).toBe('sample-clinic');
+      expect(clinicData.facility.slug).toBe('outpatient');
+      expect(clinicData.services.some((s) => s.codePrefix === 'T')).toBe(true);
+
+      const bankData = getDemoTenantData('sample-bank');
+      expect(bankData.organization.slug).toBe('sample-bank');
+      expect(bankData.facility.slug).toBe('main-hall');
+      expect(bankData.services.some((s) => s.codePrefix === 'C')).toBe(true);
+
+      // Graceful fallback for unknown slug
+      const unknownData = getDemoTenantData('non-existent-tenant');
+      expect(unknownData.organization.slug).toBe('ubuea');
+
+      // Verify all demo organizations are distinct
+      const allOrgs = getAllDemoOrganizations();
+      const slugs = allOrgs.map((o) => o.organization.slug);
+      expect(new Set(slugs).size).toBe(4);
+    });
+  });
 });

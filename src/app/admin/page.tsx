@@ -56,7 +56,7 @@ export default function AdminPage() {
       isOpen: true,
       title: `${facility.name} — Lobby Portal`,
       subtitle: 'Scan at entrance to select a service and take a virtual ticket',
-      url: `${origin}/join`,
+      url: `${origin}/${organization.slug}/${facility.slug}`,
     });
   };
 
@@ -65,7 +65,7 @@ export default function AdminPage() {
       isOpen: true,
       title: service.name,
       subtitle: `Direct shortcut queue for ${service.name}`,
-      url: `${origin}/join?service=${service.id}`,
+      url: `${origin}/${organization.slug}/${facility.slug}?service=${service.id}`,
       serviceCode: service.codePrefix,
     });
   };
@@ -151,14 +151,14 @@ export default function AdminPage() {
             </div>
 
             <Link
-              href="/staff"
+              href={`/${organization.slug}/${facility.slug}/staff`}
               className="px-3 py-1.5 border border-[#17201d] bg-white font-mono text-xs font-bold hover:bg-[#f3f4f1] transition-colors"
             >
               Staff Console →
             </Link>
 
             <Link
-              href="/display"
+              href={`/${organization.slug}/${facility.slug}/display`}
               className="px-3 py-1.5 border border-[#17201d] bg-[#17201d] text-[#e9ff6a] font-mono text-xs font-bold hover:bg-[#2c3832] transition-colors"
             >
               Lobby Board →
