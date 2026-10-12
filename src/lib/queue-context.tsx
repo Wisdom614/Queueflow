@@ -53,7 +53,7 @@ interface QueueContextType {
 
 const QueueContext = createContext<QueueContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'queueflow_state_v1';
+const STORAGE_KEY = 'queueflow_state_v2';
 const CHANNEL_NAME = 'queueflow_channel';
 
 interface StoredState {
@@ -214,11 +214,11 @@ export function QueueProvider({
         if (isMounted && res.success && res.data) {
           setOrganization(res.data.organization);
           setFacility(res.data.facility);
-          if (res.data.tickets && res.data.tickets.length > 0) {
-            writeState(res.data.tickets, res.data.desks.length > 0 ? res.data.desks : memoryState.desks, res.data.services);
-          } else if (res.data.services && res.data.services.length > 0) {
-            writeState(memoryState.tickets, res.data.desks, res.data.services);
-          }
+          writeState(
+            res.data.tickets || [],
+            res.data.desks && res.data.desks.length > 0 ? res.data.desks : memoryState.desks,
+            res.data.services && res.data.services.length > 0 ? res.data.services : memoryState.services
+          );
         }
       } catch (err) {
         console.warn(`Initial Supabase fetch for ${orgSlug}/${facilitySlug || ''} skipped or offline, using cache:`, err);
@@ -236,8 +236,8 @@ export function QueueProvider({
         { event: '*', schema: 'public', table: 'tickets', filter: `facility_id=eq.${facility.id}` },
         async () => {
           const res = await fetchQueueInitialState(orgSlug, facilitySlug);
-          if (res.success && res.data && res.data.tickets) {
-            writeState(res.data.tickets, memoryState.desks, memoryState.services);
+          if (res.success && res.data) {
+            writeState(res.data.tickets || [], memoryState.desks, memoryState.services);
           }
         }
       )

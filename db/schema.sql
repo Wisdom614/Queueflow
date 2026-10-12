@@ -37,10 +37,12 @@ CREATE TABLE facilities (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   name VARCHAR(255) NOT NULL,
+  slug VARCHAR(100) NOT NULL,
   location VARCHAR(255) NOT NULL,
   timezone VARCHAR(50) DEFAULT 'UTC',
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(org_id, slug)
 );
 
 -- Services

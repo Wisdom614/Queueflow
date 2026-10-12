@@ -14,7 +14,7 @@ interface TenantDemoCard {
   facilitySlug: string;
   facilityName: string;
   services: string[];
-  metrics: { activeQueue: number; avgWait: string; openDesks: number };
+  metrics: { estWait: string; serviceCount: string; openDesks: number };
 }
 
 const DEMO_TENANTS: TenantDemoCard[] = [
@@ -23,24 +23,24 @@ const DEMO_TENANTS: TenantDemoCard[] = [
     name: 'University of Buea',
     sector: 'Higher Education',
     badge: 'Academic Preset',
-    tagline: 'Student fees, clearance, admissions, and ID card card operations.',
+    tagline: 'Student fees, clearance, admissions, and ID card operations on Molyko campus.',
     orgSlug: 'ubuea',
     facilitySlug: 'central-bursary',
-    facilityName: 'Central Bursary Complex',
-    services: ['Tuition Fee Cashier (B)', 'Transcript Clearance (T)', 'Student Card Issuance (C)'],
-    metrics: { activeQueue: 4, avgWait: '14 min', openDesks: 3 },
+    facilityName: 'Central Bursary & Student Accounts',
+    services: ['Tuition & Fee Payment (B)', 'Official Transcripts & Certificates (T)', 'Student ID & Biometrics (S)'],
+    metrics: { estWait: '4-8 min', serviceCount: '3 Queues', openDesks: 4 },
   },
   {
     id: 'sample-telecom',
     name: 'Metropolitan Telecom',
     sector: 'Telecommunications',
     badge: 'Telecom Preset',
-    tagline: 'High-volume SIM registration, hardware repairs, and billing support.',
+    tagline: 'High-volume SIM registration, fiber installations, and billing support.',
     orgSlug: 'sample-telecom',
     facilitySlug: 'downtown',
-    facilityName: 'Downtown Service Center',
-    services: ['SIM Card & eSIM Setup (S)', 'Billing & Account Services (B)', 'Technical Device Support (C)'],
-    metrics: { activeQueue: 2, avgWait: '10 min', openDesks: 3 },
+    facilityName: 'Downtown Customer Service Center',
+    services: ['SIM Registration & Replacement (S)', 'Postpaid Billing & Cash Desk (B)', 'Technical Device & Fiber Support (C)'],
+    metrics: { estWait: '4-6 min', serviceCount: '3 Queues', openDesks: 3 },
   },
   {
     id: 'sample-clinic',
@@ -50,9 +50,9 @@ const DEMO_TENANTS: TenantDemoCard[] = [
     tagline: 'Outpatient patient intake, medical consultations, and dispensary.',
     orgSlug: 'sample-clinic',
     facilitySlug: 'outpatient',
-    facilityName: 'Main Outpatient Clinic',
-    services: ['Triage & Vital Signs (T)', 'General Consultation (C)', 'Pharmacy & Dispensing (P)'],
-    metrics: { activeQueue: 2, avgWait: '18 min', openDesks: 3 },
+    facilityName: 'Main Outpatient Clinic & Diagnostics',
+    services: ['General Triage & Vital Signs (T)', 'Physician Consultation Room (C)', 'Pharmacy & Medication Dispensing (P)'],
+    metrics: { estWait: '4-12 min', serviceCount: '3 Queues', openDesks: 3 },
   },
   {
     id: 'sample-bank',
@@ -63,8 +63,8 @@ const DEMO_TENANTS: TenantDemoCard[] = [
     orgSlug: 'sample-bank',
     facilitySlug: 'main-hall',
     facilityName: 'Corporate Banking Branch',
-    services: ['Cash Deposits & Withdrawals (C)', 'Customer Relations & Accounts (A)'],
-    metrics: { activeQueue: 2, avgWait: '12 min', openDesks: 4 },
+    services: ['Cash Deposits & Withdrawals (C)', 'Account Operations & Customer Care (A)', 'Foreign Exchange & Wire Transfers (F)'],
+    metrics: { estWait: '4-10 min', serviceCount: '3 Queues', openDesks: 3 },
   },
 ];
 
@@ -140,22 +140,22 @@ export default function Home() {
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="font-mono text-[10px] uppercase text-[#56605b] block">
-                      Live Dynamic Ticket Flow
+                      Live Customer Intake
                     </span>
-                    <span className="font-mono text-2xl font-black text-[#17201d]">
-                      Pass B284 &bull; Counter 02
+                    <span className="font-mono text-xl sm:text-2xl font-black text-[#17201d]">
+                      Instant Virtual Pass
                     </span>
                   </div>
                   <Link
-                    href={`/${activeTenant.orgSlug}/${activeTenant.facilitySlug}/ticket/B284`}
+                    href={`/${activeTenant.orgSlug}/${activeTenant.facilitySlug}`}
                     className="px-3.5 py-1.5 bg-[#17201d] text-[#e9ff6a] font-mono text-xs font-bold uppercase hover:bg-[#2c3832] transition-colors"
                   >
-                    View Pass →
+                    Take Pass →
                   </Link>
                 </div>
                 <div className="mt-3 flex items-center justify-between text-[11px] font-mono text-[#56605b] border-t border-[#f0f0ed] pt-2">
                   <span>Facility: {activeTenant.facilityName}</span>
-                  <span className="text-[#17201d] font-bold">Estimated 6m</span>
+                  <span className="text-[#17201d] font-bold">Zero Physical Lines</span>
                 </div>
               </div>
             </div>
@@ -254,20 +254,20 @@ export default function Home() {
                 {/* Live Stats */}
                 <div className="grid grid-cols-3 gap-3 pt-3 border-t border-[#cfd4cd]">
                   <div className="p-3 bg-white border border-[#cfd4cd]">
-                    <span className="font-mono text-[10px] text-[#56605b] block">In Queue</span>
-                    <span className="font-mono text-xl font-bold text-[#17201d]">
-                      {activeTenant.metrics.activeQueue} tickets
+                    <span className="font-mono text-[10px] text-[#56605b] block">Avg Pace</span>
+                    <span className="font-mono text-lg sm:text-xl font-bold text-[#17201d]">
+                      {activeTenant.metrics.estWait}
                     </span>
                   </div>
                   <div className="p-3 bg-white border border-[#cfd4cd]">
-                    <span className="font-mono text-[10px] text-[#56605b] block">Est. Wait</span>
-                    <span className="font-mono text-xl font-bold text-[#17201d]">
-                      {activeTenant.metrics.avgWait}
+                    <span className="font-mono text-[10px] text-[#56605b] block">Service Points</span>
+                    <span className="font-mono text-lg sm:text-xl font-bold text-[#17201d]">
+                      {activeTenant.metrics.serviceCount}
                     </span>
                   </div>
                   <div className="p-3 bg-white border border-[#cfd4cd]">
                     <span className="font-mono text-[10px] text-[#56605b] block">Active Desks</span>
-                    <span className="font-mono text-xl font-bold text-[#17201d]">
+                    <span className="font-mono text-lg sm:text-xl font-bold text-[#17201d]">
                       {activeTenant.metrics.openDesks} counters
                     </span>
                   </div>
