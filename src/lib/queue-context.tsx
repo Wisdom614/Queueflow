@@ -227,14 +227,16 @@ export function QueueProvider({
 
     loadRemoteState();
 
-    // Supabase Realtime channel strictly filtered to this facility
-    const channelName = `queueflow_realtime_${facility.id}`;
+    // Unique channel identifier prevents "cannot add callbacks after subscribe" collision during React Fast Refresh or StrictMode
+    const channelId = `${facility.id}_${Math.random().toString(36).slice(2, 9)}`;
+    const channelName = `queueflow_realtime_${channelId}`;
     const channel = supabase
       .channel(channelName)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'tickets', filter: `facility_id=eq.${facility.id}` },
         async () => {
+          if (!isMounted) return;
           const res = await fetchQueueInitialState(orgSlug, facilitySlug);
           if (res.success && res.data) {
             writeState(res.data.tickets || [], memoryState.desks, memoryState.services);
@@ -245,6 +247,7 @@ export function QueueProvider({
         'postgres_changes',
         { event: '*', schema: 'public', table: 'desks', filter: `facility_id=eq.${facility.id}` },
         async () => {
+          if (!isMounted) return;
           const res = await fetchQueueInitialState(orgSlug, facilitySlug);
           if (res.success && res.data && res.data.desks) {
             writeState(memoryState.tickets, res.data.desks, memoryState.services);
