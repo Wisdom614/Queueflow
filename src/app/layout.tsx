@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { QueueProvider } from '@/lib/queue-context';
+import { AuthProvider } from '@/lib/auth-context';
 import { Navigation } from '@/components/Navigation';
 
 const geistSans = Geist({
@@ -30,10 +31,12 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-[#f8f8f5] text-[#17201d]">
-        <QueueProvider>
-          <Navigation />
-          <div className="flex-1 flex flex-col">{children}</div>
-        </QueueProvider>
+        <AuthProvider>
+          <QueueProvider>
+            <Navigation />
+            <div className="flex-1 flex flex-col">{children}</div>
+          </QueueProvider>
+        </AuthProvider>
       </body>
     </html>
   );

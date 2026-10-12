@@ -2,8 +2,11 @@
 
 import React, { useState } from 'react';
 import { useQueue } from '@/lib/queue-context';
+import { AuthGuard } from '@/components/AuthGuard';
+import { useAuth } from '@/lib/auth-context';
 
 export default function StaffConsolePage() {
+  const { user } = useAuth();
   const {
     desks,
     services,
@@ -16,8 +19,11 @@ export default function StaffConsolePage() {
     skipTicket,
   } = useQueue();
 
-  const [selectedDeskNumber, setSelectedDeskNumber] = useState<number>(1);
+  const [deskOverride, setDeskOverride] = useState<number | null>(null);
   const [mobileTab, setMobileTab] = useState<'station' | 'queue'>('station');
+
+  const selectedDeskNumber = deskOverride ?? (user?.assignedDeskNumber || 1);
+  const setSelectedDeskNumber = setDeskOverride;
 
   const currentDesk = desks.find((d) => d.number === selectedDeskNumber) || desks[0];
 
@@ -44,7 +50,8 @@ export default function StaffConsolePage() {
   };
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 sm:px-8 py-5 sm:py-8">
+    <AuthGuard requiredRole="operator">
+      <main className="mx-auto w-full max-w-7xl px-4 sm:px-8 py-5 sm:py-8">
       {/* Top Station Context & Desk Switcher */}
       <div className="border border-[#cfd4cd] bg-white p-4 sm:p-5 mb-5 shadow-[4px_4px_0_#d8dfd3]">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#cfd4cd] pb-4">
@@ -350,5 +357,6 @@ export default function StaffConsolePage() {
         </section>
       </div>
     </main>
-  );
+  </AuthGuard>
+);
 }

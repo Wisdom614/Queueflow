@@ -63,3 +63,13 @@ export interface QueueSummary {
   avgWaitMinutes: number;
   activeDesks: number;
 }
+
+export type UserRole = 'operator' | 'admin';
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  role: UserRole;
+  assignedDeskNumber?: number;
+}
+

@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useQueue } from '@/lib/queue-context';
 import { TicketStatus } from '@/types/queue';
+import { AuthGuard } from '@/components/AuthGuard';
 
 export default function AdminPage() {
   const {
@@ -66,7 +67,8 @@ export default function AdminPage() {
   }, [tickets, statusFilter, searchQuery]);
 
   return (
-    <main className="min-h-screen bg-[#f8f8f5] text-[#17201d] pb-20">
+    <AuthGuard requiredRole="admin">
+      <main className="min-h-screen bg-[#f8f8f5] text-[#17201d] pb-20">
       {/* Header Bar */}
       <section className="border-b border-[#cfd4cd] bg-white px-4 sm:px-8 py-6">
         <div className="mx-auto max-w-7xl flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -528,5 +530,6 @@ export default function AdminPage() {
         </section>
       </div>
     </main>
+  </AuthGuard>
   );
 }
