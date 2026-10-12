@@ -80,7 +80,7 @@ export default function TicketTrackerPage({
           </p>
           <div className="mt-6 flex flex-col gap-2">
             <Link
-              href="/join"
+              href={`/${organization.slug}/${facility.slug}`}
               className="inline-flex h-11 items-center justify-center bg-[#17201d] text-[#e9ff6a] font-bold text-xs uppercase tracking-wider hover:bg-[#2e3b35]"
             >
               Take a new ticket

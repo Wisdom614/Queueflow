@@ -9,32 +9,48 @@ export function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Omit navbar on public display for true fullscreen immersion
-  if (pathname === '/display') {
+  if (pathname === '/display' || pathname?.endsWith('/display')) {
     return null;
   }
 
+  // Parse path segments to check if inside a tenant route
+  const segments = (pathname || '').split('/').filter(Boolean);
+  const isTenantRoute = segments.length >= 2 && segments[0] !== 'ticket';
+  const orgSlug = isTenantRoute ? segments[0] : 'ubuea';
+  const facilitySlug = isTenantRoute && segments[1] !== 'admin' ? segments[1] : 'central-bursary';
+
+  const tenantBase = `/${orgSlug}/${facilitySlug}`;
+  const adminBase = `/${orgSlug}/admin`;
+
   const links = [
     { href: '/', label: 'Overview' },
-    { href: '/join', label: 'Join Queue' },
-    { href: '/staff', label: 'Staff Console' },
-    { href: '/admin', label: 'Admin & Metrics' },
-    { href: '/display', label: 'Public Display' },
+    { href: tenantBase, label: 'Join Queue' },
+    { href: `${tenantBase}/staff`, label: 'Staff Console' },
+    { href: adminBase, label: 'Admin & Metrics' },
+    { href: `${tenantBase}/display`, label: 'Public Display' },
   ];
 
   return (
     <header className="border-b border-[#cfd4cd] bg-white sticky top-0 z-50">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-8 h-14 sm:h-16">
         {/* Brand */}
-        <Link
-          href="/"
-          onClick={() => setMobileMenuOpen(false)}
-          className="flex items-center gap-2.5 font-bold tracking-tight text-[#17201d]"
-        >
-          <span className="grid size-7 sm:size-8 place-items-center bg-[#17201d] text-xs sm:text-sm font-bold text-[#e9ff6a]">
-            Q
-          </span>
-          <span className="text-base sm:text-lg">QueueFlow</span>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            onClick={() => setMobileMenuOpen(false)}
+            className="flex items-center gap-2.5 font-bold tracking-tight text-[#17201d]"
+          >
+            <span className="grid size-7 sm:size-8 place-items-center bg-[#17201d] text-xs sm:text-sm font-bold text-[#e9ff6a]">
+              Q
+            </span>
+            <span className="text-base sm:text-lg">QueueFlow</span>
+          </Link>
+          {isTenantRoute && (
+            <span className="hidden sm:inline-block font-mono text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-[#f8f8f5] border border-[#cfd4cd] text-[#56605b]">
+              {orgSlug}
+            </span>
+          )}
+        </div>
 
         {/* Desktop Navigation Links */}
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
@@ -59,7 +75,7 @@ export function Navigation() {
         {/* Right CTA */}
         <div className="flex items-center gap-3">
           <Link
-            href="/join"
+            href={tenantBase}
             onClick={() => setMobileMenuOpen(false)}
             className="inline-flex items-center border border-[#17201d] bg-[#e9ff6a] px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-[#17201d] hover:bg-[#d8ef58] transition-colors"
           >

@@ -8,6 +8,7 @@ import {
   initialServices,
   initialDesks,
   initialTickets,
+  getDemoTenantData,
 } from './mock-data';
 import {
   generateTicketNumber,
@@ -174,52 +175,79 @@ function writeState(
   notify();
 }
 
-export function QueueProvider({ children }: { children: React.ReactNode }) {
+interface QueueProviderProps {
+  children: React.ReactNode;
+  orgSlug?: string;
+  facilitySlug?: string;
+}
+
+export function QueueProvider({
+  children,
+  orgSlug = 'ubuea',
+  facilitySlug,
+}: QueueProviderProps) {
+  const demoPreset = React.useMemo(
+    () => getDemoTenantData(orgSlug, facilitySlug),
+    [orgSlug, facilitySlug]
+  );
+  const [organization, setOrganization] = React.useState<Organization>(demoPreset.organization);
+  const [facility, setFacility] = React.useState<Facility>(demoPreset.facility);
+
+  useEffect(() => {
+    const updatedPreset = getDemoTenantData(orgSlug, facilitySlug);
+    setOrganization(updatedPreset.organization);
+    setFacility(updatedPreset.facility);
+  }, [orgSlug, facilitySlug]);
+
   const state = useSyncExternalStore(subscribe, getStoredSnapshot, getServerSnapshot);
   const tickets = state.tickets;
   const desks = state.desks;
   const services = state.services || initialServices;
 
-  // Sync with Supabase on mount and establish real-time listening
+  // Sync with Supabase on mount and establish scoped real-time listening
   useEffect(() => {
     let isMounted = true;
 
     async function loadRemoteState() {
       try {
-        const res = await fetchQueueInitialState();
+        const res = await fetchQueueInitialState(orgSlug, facilitySlug);
         if (isMounted && res.success && res.data) {
-          // If Supabase has today tickets, merge or write
+          setOrganization(res.data.organization);
+          setFacility(res.data.facility);
           if (res.data.tickets && res.data.tickets.length > 0) {
-            writeState(res.data.tickets, res.data.desks.length > 0 ? res.data.desks : memoryState.desks);
+            writeState(res.data.tickets, res.data.desks.length > 0 ? res.data.desks : memoryState.desks, res.data.services);
+          } else if (res.data.services && res.data.services.length > 0) {
+            writeState(memoryState.tickets, res.data.desks, res.data.services);
           }
         }
       } catch (err) {
-        console.warn('Initial Supabase fetch skipped or offline, using cache:', err);
+        console.warn(`Initial Supabase fetch for ${orgSlug}/${facilitySlug || ''} skipped or offline, using cache:`, err);
       }
     }
 
     loadRemoteState();
 
-    // Supabase Realtime channel
+    // Supabase Realtime channel strictly filtered to this facility
+    const channelName = `queueflow_realtime_${facility.id}`;
     const channel = supabase
-      .channel('queueflow_realtime')
+      .channel(channelName)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'tickets' },
+        { event: '*', schema: 'public', table: 'tickets', filter: `facility_id=eq.${facility.id}` },
         async () => {
-          const res = await fetchQueueInitialState();
+          const res = await fetchQueueInitialState(orgSlug, facilitySlug);
           if (res.success && res.data && res.data.tickets) {
-            writeState(res.data.tickets, memoryState.desks);
+            writeState(res.data.tickets, memoryState.desks, memoryState.services);
           }
         }
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'desks' },
+        { event: '*', schema: 'public', table: 'desks', filter: `facility_id=eq.${facility.id}` },
         async () => {
-          const res = await fetchQueueInitialState();
+          const res = await fetchQueueInitialState(orgSlug, facilitySlug);
           if (res.success && res.data && res.data.desks) {
-            writeState(memoryState.tickets, res.data.desks);
+            writeState(memoryState.tickets, res.data.desks, memoryState.services);
           }
         }
       )
@@ -229,7 +257,7 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
       isMounted = false;
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [facility.id, facilitySlug, orgSlug]);
 
   const getService = useCallback(
     (serviceId: string) => {
@@ -280,7 +308,7 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
         id: `t-${ticketNumber.toLowerCase()}-${Date.now().toString().slice(-4)}`,
         ticketNumber,
         serviceId,
-        facilityId: initialFacility.id,
+        facilityId: facility.id,
         customerName: customerName.trim(),
         customerPhone: customerPhone?.trim() || undefined,
         status: 'waiting',
@@ -291,13 +319,13 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
       writeState(updated, desks);
 
       // Async persist in Supabase
-      joinQueueAction(serviceId, customerName, customerPhone).catch((err) => {
+      joinQueueAction(serviceId, customerName, customerPhone, facility.id).catch((err) => {
         console.warn('Background Supabase joinQueue failed:', err);
       });
 
       return newTicket;
     },
-    [desks, getService, tickets]
+    [desks, facility.id, getService, tickets]
   );
 
   const callNext = useCallback(
@@ -307,14 +335,14 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
         writeState(updatedTickets, desks);
       }
 
-      // Async call in Supabase
-      callNextAction(deskNumber).catch((err) => {
+      // Async call in Supabase with facility isolation
+      callNextAction(deskNumber, undefined, facility.id, orgSlug).catch((err) => {
         console.warn('Background Supabase callNext failed:', err);
       });
 
       return calledTicket;
     },
-    [desks, tickets]
+    [desks, facility.id, orgSlug, tickets]
   );
 
   const startService = useCallback(
@@ -325,11 +353,11 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
           : t
       );
       writeState(updated, desks);
-      updateTicketStatusAction(ticketId, 'in_service').catch((err) => {
+      updateTicketStatusAction(ticketId, 'in_service', undefined, facility.id).catch((err) => {
         console.warn('Background Supabase startService failed:', err);
       });
     },
-    [desks, tickets]
+    [desks, facility.id, tickets]
   );
 
   const completeService = useCallback(
@@ -340,11 +368,11 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
           : t
       );
       writeState(updated, desks);
-      updateTicketStatusAction(ticketId, 'completed').catch((err) => {
+      updateTicketStatusAction(ticketId, 'completed', undefined, facility.id).catch((err) => {
         console.warn('Background Supabase completeService failed:', err);
       });
     },
-    [desks, tickets]
+    [desks, facility.id, tickets]
   );
 
   const skipTicket = useCallback(
@@ -353,11 +381,11 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
         t.id === ticketId ? { ...t, status: 'no_show' as TicketStatus } : t
       );
       writeState(updated, desks);
-      updateTicketStatusAction(ticketId, 'no_show').catch((err) => {
+      updateTicketStatusAction(ticketId, 'no_show', undefined, facility.id).catch((err) => {
         console.warn('Background Supabase skipTicket failed:', err);
       });
     },
-    [desks, tickets]
+    [desks, facility.id, tickets]
   );
 
   const cancelTicket = useCallback(
@@ -366,11 +394,11 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
         t.id === ticketId ? { ...t, status: 'cancelled' as TicketStatus } : t
       );
       writeState(updated, desks);
-      updateTicketStatusAction(ticketId, 'cancelled').catch((err) => {
+      updateTicketStatusAction(ticketId, 'cancelled', undefined, facility.id).catch((err) => {
         console.warn('Background Supabase cancelTicket failed:', err);
       });
     },
-    [desks, tickets]
+    [desks, facility.id, tickets]
   );
 
   const transferTicket = useCallback(
@@ -382,12 +410,12 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
       );
       if (transferredTicket) {
         writeState(updatedTickets, desks);
-        transferTicketAction(ticketId, targetServiceId).catch((err) => {
+        transferTicketAction(ticketId, targetServiceId, undefined, facility.id).catch((err) => {
           console.warn('Background Supabase transferTicket failed:', err);
         });
       }
     },
-    [desks, tickets]
+    [desks, facility.id, tickets]
   );
 
   const updateDeskStatus = useCallback(
@@ -396,11 +424,11 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
         d.number === deskNumber ? { ...d, status } : d
       );
       writeState(tickets, updatedDesks);
-      updateDeskStatusAction(deskNumber, status).catch((err) => {
+      updateDeskStatusAction(deskNumber, status, facility.id).catch((err) => {
         console.warn('Background Supabase updateDeskStatus failed:', err);
       });
     },
-    [desks, tickets]
+    [desks, facility.id, tickets]
   );
 
   const addService = useCallback(
@@ -408,7 +436,7 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
       const newService: Service = {
         ...data,
         id: `srv-${Date.now().toString().slice(-6)}`,
-        facilityId: initialFacility.id,
+        facilityId: facility.id,
       };
       const updatedServices = [...services, newService];
       // Automatically associate the new service with open desks so counters can call tickets
@@ -421,7 +449,7 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
       writeState(tickets, updatedDesks, updatedServices);
       return newService;
     },
-    [desks, services, tickets]
+    [desks, facility.id, services, tickets]
   );
 
   const updateService = useCallback(
@@ -448,14 +476,14 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
-    writeState(initialTickets, initialDesks, initialServices);
-  }, []);
+    writeState(demoPreset.tickets, demoPreset.desks, demoPreset.services);
+  }, [demoPreset.desks, demoPreset.services, demoPreset.tickets]);
 
   return (
     <QueueContext.Provider
       value={{
-        organization: initialOrganization,
-        facility: initialFacility,
+        organization,
+        facility,
         services,
         desks,
         tickets,
