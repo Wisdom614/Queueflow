@@ -75,6 +75,14 @@ export function Navigation() {
         {/* Right CTA */}
         <div className="flex items-center gap-3">
           <Link
+            href="/onboard"
+            onClick={() => setMobileMenuOpen(false)}
+            className="hidden sm:inline-flex items-center border border-[#17201d] bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-[#17201d] hover:bg-[#f3f4f1] transition-colors"
+          >
+            + Register Org
+          </Link>
+
+          <Link
             href={tenantBase}
             onClick={() => setMobileMenuOpen(false)}
             className="inline-flex items-center border border-[#17201d] bg-[#e9ff6a] px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-[#17201d] hover:bg-[#d8ef58] transition-colors"

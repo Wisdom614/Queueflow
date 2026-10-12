@@ -95,18 +95,26 @@ export default function Home() {
             {/* Quick Actions */}
             <div className="flex flex-wrap gap-3 pt-2">
               <Link
-                href={`/${activeTenant.orgSlug}/${activeTenant.facilitySlug}`}
+                href="/onboard"
                 className="h-12 px-6 bg-[#17201d] text-[#e9ff6a] font-bold text-sm uppercase tracking-wider hover:bg-[#2c3832] transition-colors flex items-center justify-center gap-2 shadow-[4px_4px_0_#17201d]"
               >
-                <span>Launch Demo: {activeTenant.name}</span>
+                <span>Register Organization</span>
                 <span className="font-mono text-sm">→</span>
               </Link>
 
               <Link
-                href={`/${activeTenant.orgSlug}/admin`}
-                className="h-12 px-6 bg-white border border-[#17201d] text-[#17201d] font-semibold text-sm hover:bg-[#f3f4f1] transition-colors flex items-center justify-center"
+                href={`/${activeTenant.orgSlug}/${activeTenant.facilitySlug}`}
+                className="h-12 px-6 bg-white border border-[#17201d] text-[#17201d] font-semibold text-sm hover:bg-[#f3f4f1] transition-colors flex items-center justify-center gap-2"
               >
-                Tenant Admin Console
+                <span>Explore Preset: {activeTenant.name}</span>
+                <span className="font-mono text-xs text-[#56605b]">↗</span>
+              </Link>
+
+              <Link
+                href={`/${activeTenant.orgSlug}/admin`}
+                className="h-12 px-5 bg-white border border-[#cfd4cd] text-[#56605b] font-mono text-xs hover:text-[#17201d] hover:border-[#17201d] transition-colors flex items-center justify-center"
+              >
+                Admin Panel
               </Link>
             </div>
 

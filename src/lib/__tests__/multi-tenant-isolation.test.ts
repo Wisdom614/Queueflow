@@ -240,4 +240,38 @@ describe('Multi-Tenant Isolation & Boundary Verification Tests', () => {
       expect(new Set(slugs).size).toBe(4);
     });
   });
+
+  describe('Contract 5: Self-Service Organization Onboarding Validation', () => {
+    it('validates required fields and rejects empty entity or services', async () => {
+      const { createOrganizationAction } = await import('../../app/actions/queue');
+
+      // Rejects empty organization name
+      const res1 = await createOrganizationAction({
+        organizationName: '',
+        organizationSlug: '',
+        category: 'Healthcare',
+        facilityName: 'Main Clinic',
+        facilitySlug: 'main-clinic',
+        location: 'Douala',
+        services: [{ name: 'Triage', codePrefix: 'T', avgServiceMinutes: 5 }],
+        desks: [{ number: 1, name: 'Desk 1' }],
+      });
+      expect(res1.success).toBe(false);
+      expect(res1.error).toContain('Organization name is required');
+
+      // Rejects empty services list
+      const res2 = await createOrganizationAction({
+        organizationName: 'Valid Clinic',
+        organizationSlug: 'valid-clinic',
+        category: 'Healthcare',
+        facilityName: 'Main Clinic',
+        facilitySlug: 'main-clinic',
+        location: 'Douala',
+        services: [],
+        desks: [{ number: 1, name: 'Desk 1' }],
+      });
+      expect(res2.success).toBe(false);
+      expect(res2.error).toContain('At least one service queue is required');
+    });
+  });
 });
