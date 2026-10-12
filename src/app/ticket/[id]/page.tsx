@@ -30,30 +30,44 @@ export default function TicketTrackerPage({
 
   const hasBeepedRef = React.useRef(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
 
-  // Sound chime when called
+  const playChime = React.useCallback(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15); // A5
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.6);
+      setAudioUnlocked(true);
+    } catch {
+      // Audio autoplay restrictions
+    }
+  }, []);
+
+  // Sound chime and vibrate when called
   useEffect(() => {
     if (ticket?.status === 'called' && !hasBeepedRef.current) {
       hasBeepedRef.current = true;
-      if (typeof window !== 'undefined') {
+      playChime();
+
+      if (typeof window !== 'undefined' && 'vibrate' in navigator) {
         try {
-          const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-          osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15); // A5
-          gain.gain.setValueAtTime(0.3, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
-          osc.start(ctx.currentTime);
-          osc.stop(ctx.currentTime + 0.6);
+          navigator.vibrate([200, 100, 200, 100, 400]);
         } catch {
-          // Audio autoplay restrictions
+          // ignore
         }
       }
     }
-  }, [ticket?.status]);
+  }, [ticket?.status, playChime]);
 
   if (!ticket) {
     return (
@@ -204,6 +218,25 @@ export default function TicketTrackerPage({
             )}
           </div>
         )}
+
+        {/* Audio & Vibration Unlock Banner */}
+        <div className="p-3 bg-[#f8f8f5] border-b border-[#cfd4cd]">
+          <button
+            type="button"
+            onClick={playChime}
+            className="w-full py-2 px-3 border border-[#17201d] bg-white hover:bg-[#e9ff6a] transition-colors flex items-center justify-between text-xs font-mono"
+          >
+            <span className="flex items-center gap-2">
+              <span>{audioUnlocked ? '🔊' : '🔔'}</span>
+              <span className="font-bold">
+                {audioUnlocked ? 'Turn Alerts Enabled' : 'Tap to Enable Audio & Vibration'}
+              </span>
+            </span>
+            <span className="text-[10px] text-[#56605b] uppercase font-semibold">
+              {audioUnlocked ? 'Test Sound' : 'Tap to Unlock'}
+            </span>
+          </button>
+        </div>
 
         {/* Guidance Text */}
         <div className="p-4 bg-white text-xs text-[#56605b] border-b border-[#cfd4cd]">

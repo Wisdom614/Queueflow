@@ -5,6 +5,7 @@ import {
   calculateEstimatedWaitMinutes,
   isValidStatusTransition,
   processCallNext,
+  processTransferTicket,
 } from '../queue-engine';
 import { Ticket, Desk } from '@/types/queue';
 
@@ -225,6 +226,61 @@ describe('Queue Engine - Domain Logic Tests', () => {
       const result = processCallNext(desks, tickets, 99);
       expect(result.calledTicket).toBeNull();
       expect(result.updatedTickets).toEqual(tickets);
+    });
+  });
+
+  describe('processTransferTicket', () => {
+    const initialTickets: Ticket[] = [
+      {
+        id: 't-1',
+        ticketNumber: 'B101',
+        serviceId: 'srv-fee',
+        facilityId: 'fac-1',
+        customerName: 'Customer 1',
+        status: 'called',
+        deskNumber: 1,
+        staffName: 'Agent Alice',
+        joinedAt: '2026-10-12T00:00:00Z',
+        calledAt: '2026-10-12T00:05:00Z',
+      },
+      {
+        id: 't-2',
+        ticketNumber: 'B102',
+        serviceId: 'srv-fee',
+        facilityId: 'fac-1',
+        customerName: 'Customer 2',
+        status: 'completed',
+        joinedAt: '2026-10-12T00:01:00Z',
+      },
+    ];
+
+    it('successfully transfers an active ticket to a new service queue', () => {
+      const transferTime = '2026-10-12T00:08:00Z';
+      const result = processTransferTicket(initialTickets, 't-1', 'srv-transcript', transferTime);
+
+      expect(result.transferredTicket).not.toBeNull();
+      expect(result.transferredTicket?.serviceId).toBe('srv-transcript');
+      expect(result.transferredTicket?.status).toBe('waiting');
+      expect(result.transferredTicket?.deskNumber).toBeUndefined();
+      expect(result.transferredTicket?.staffName).toBeUndefined();
+      expect(result.transferredTicket?.calledAt).toBeUndefined();
+      expect(result.transferredTicket?.joinedAt).toBe(transferTime);
+
+      const inUpdatedList = result.updatedTickets.find((t) => t.id === 't-1');
+      expect(inUpdatedList?.status).toBe('waiting');
+      expect(inUpdatedList?.serviceId).toBe('srv-transcript');
+    });
+
+    it('rejects transfer for tickets in completed or cancelled states', () => {
+      const result = processTransferTicket(initialTickets, 't-2', 'srv-transcript');
+      expect(result.transferredTicket).toBeNull();
+      expect(result.updatedTickets).toEqual(initialTickets);
+    });
+
+    it('returns null if ticket ID is not found', () => {
+      const result = processTransferTicket(initialTickets, 'non-existent', 'srv-transcript');
+      expect(result.transferredTicket).toBeNull();
+      expect(result.updatedTickets).toEqual(initialTickets);
     });
   });
 });

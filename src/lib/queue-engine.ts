@@ -114,3 +114,38 @@ export function processCallNext(
 
   return { calledTicket, updatedTickets };
 }
+
+/**
+ * Domain command to transfer an active or waiting ticket to a different service.
+ * Resets desk assignment and places the ticket into 'waiting' status for targetServiceId.
+ */
+export function processTransferTicket(
+  tickets: Ticket[],
+  ticketId: string,
+  targetServiceId: string,
+  timestamp: string = new Date().toISOString()
+): {
+  transferredTicket: Ticket | null;
+  updatedTickets: Ticket[];
+} {
+  const target = tickets.find((t) => t.id === ticketId);
+  if (!target || target.status === 'completed' || target.status === 'cancelled') {
+    return { transferredTicket: null, updatedTickets: tickets };
+  }
+
+  const transferredTicket: Ticket = {
+    ...target,
+    serviceId: targetServiceId,
+    status: 'waiting',
+    deskNumber: undefined,
+    staffName: undefined,
+    calledAt: undefined,
+    startedAt: undefined,
+    completedAt: undefined,
+    joinedAt: timestamp,
+  };
+
+  const updatedTickets = tickets.map((t) => (t.id === ticketId ? transferredTicket : t));
+  return { transferredTicket, updatedTickets };
+}
+

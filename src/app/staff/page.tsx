@@ -17,10 +17,13 @@ export default function StaffConsolePage() {
     startService,
     completeService,
     skipTicket,
+    transferTicket,
   } = useQueue();
 
   const [deskOverride, setDeskOverride] = useState<number | null>(null);
   const [mobileTab, setMobileTab] = useState<'station' | 'queue'>('station');
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [targetServiceId, setTargetServiceId] = useState<string>('');
 
   const selectedDeskNumber = deskOverride ?? (user?.assignedDeskNumber || 1);
   const setSelectedDeskNumber = setDeskOverride;
@@ -211,13 +214,75 @@ export default function StaffConsolePage() {
                       </button>
                     )}
 
-                    <button
-                      type="button"
-                      onClick={() => skipTicket(currentTicket.id)}
-                      className="h-14 border border-[#e02424] text-[#e02424] bg-white hover:bg-[#fdf2f2] font-semibold text-xs uppercase tracking-wider transition-colors flex items-center justify-center"
-                    >
-                      Skip / No-Show
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const otherServices = services.filter((s) => s.id !== currentTicket.serviceId);
+                          if (otherServices.length > 0) {
+                            setTargetServiceId(otherServices[0].id);
+                          }
+                          setTransferModalOpen(true);
+                        }}
+                        className="flex-1 h-14 border border-[#17201d] bg-[#f8f8f5] hover:bg-white text-[#17201d] font-semibold text-xs uppercase tracking-wider transition-colors flex items-center justify-center"
+                      >
+                        Transfer Ticket
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => skipTicket(currentTicket.id)}
+                        className="flex-1 h-14 border border-[#e02424] text-[#e02424] bg-white hover:bg-[#fdf2f2] font-semibold text-xs uppercase tracking-wider transition-colors flex items-center justify-center"
+                      >
+                        Skip / No-Show
+                      </button>
+                    </div>
+
+                    {/* Transfer Modal */}
+                    {transferModalOpen && (
+                      <div className="sm:col-span-2 p-4 border-2 border-[#17201d] bg-[#f8f8f5] mt-2">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="font-mono text-xs font-bold text-[#17201d] uppercase">
+                            Route to Next Service Queue
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setTransferModalOpen(false)}
+                            className="font-mono text-xs text-[#56605b] hover:text-[#17201d]"
+                          >
+                            ✕ Cancel
+                          </button>
+                        </div>
+                        <p className="text-xs text-[#56605b] mb-3">
+                          Move ticket <strong>{currentTicket.ticketNumber}</strong> directly into another service queue:
+                        </p>
+                        <select
+                          value={targetServiceId}
+                          onChange={(e) => setTargetServiceId(e.target.value)}
+                          className="w-full h-11 px-3 border border-[#cfd4cd] bg-white font-sans text-sm mb-3 focus:outline-none focus:border-[#17201d]"
+                        >
+                          {services
+                            .filter((s) => s.id !== currentTicket.serviceId)
+                            .map((s) => (
+                              <option key={s.id} value={s.id}>
+                                [{s.codePrefix}] {s.name} (~{s.avgServiceMinutes} min)
+                              </option>
+                            ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (targetServiceId) {
+                              transferTicket(currentTicket.id, targetServiceId);
+                              setTransferModalOpen(false);
+                            }
+                          }}
+                          className="w-full h-11 bg-[#17201d] text-[#e9ff6a] font-bold text-xs uppercase tracking-wider hover:bg-[#2c3832] transition-colors"
+                        >
+                          Confirm & Transfer Customer →
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (

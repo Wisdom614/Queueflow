@@ -4,6 +4,7 @@ import {
   dbJoinQueue,
   dbCallNext,
   dbUpdateTicketStatus,
+  dbTransferTicket,
   getFacilityInitialData,
   getFacilityTodayTickets,
 } from '@/lib/supabase/queue-service';
@@ -118,3 +119,22 @@ export async function updateDeskStatusAction(
     return { success: false, error: message };
   }
 }
+
+/**
+ * Server action to transfer a ticket to a new service.
+ */
+export async function transferTicketAction(
+  ticketId: string,
+  targetServiceId: string,
+  actorName?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await dbTransferTicket(ticketId, targetServiceId, actorName);
+    return { success: true };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error in transferTicketAction:', error);
+    return { success: false, error: message };
+  }
+}
+

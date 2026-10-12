@@ -14,6 +14,7 @@ import {
   calculateWaitingAhead,
   calculateEstimatedWaitMinutes,
   processCallNext,
+  processTransferTicket,
 } from './queue-engine';
 import { supabase } from './supabase/client';
 import {
@@ -22,6 +23,7 @@ import {
   callNextAction,
   updateTicketStatusAction,
   updateDeskStatusAction,
+  transferTicketAction,
 } from '@/app/actions/queue';
 
 interface QueueContextType {
@@ -36,6 +38,7 @@ interface QueueContextType {
   completeService: (ticketId: string) => void;
   skipTicket: (ticketId: string) => void;
   cancelTicket: (ticketId: string) => void;
+  transferTicket: (ticketId: string, targetServiceId: string) => void;
   getTicket: (ticketId: string) => Ticket | undefined;
   getService: (serviceId: string) => Service | undefined;
   getWaitingAheadCount: (ticket: Ticket) => number;
@@ -344,6 +347,23 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
     [desks, tickets]
   );
 
+  const transferTicket = useCallback(
+    (ticketId: string, targetServiceId: string) => {
+      const { transferredTicket, updatedTickets } = processTransferTicket(
+        tickets,
+        ticketId,
+        targetServiceId
+      );
+      if (transferredTicket) {
+        writeState(updatedTickets, desks);
+        transferTicketAction(ticketId, targetServiceId).catch((err) => {
+          console.warn('Background Supabase transferTicket failed:', err);
+        });
+      }
+    },
+    [desks, tickets]
+  );
+
   const updateDeskStatus = useCallback(
     (deskNumber: number, status: 'open' | 'closed' | 'break') => {
       const updatedDesks = desks.map((d) =>
@@ -380,6 +400,7 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
         completeService,
         skipTicket,
         cancelTicket,
+        transferTicket,
         getTicket,
         getService,
         getWaitingAheadCount,

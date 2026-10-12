@@ -312,3 +312,45 @@ export async function dbUpdateTicketStatus(
 
   return updated;
 }
+
+/**
+ * Transfer a ticket to a new service in Supabase, unbinding previous desk and logging event.
+ */
+export async function dbTransferTicket(
+  ticketId: string,
+  targetServiceId: string,
+  actorName?: string
+) {
+  const supabase = createServerClient();
+
+  const { data: updated, error } = await supabase
+    .from('tickets')
+    .update({
+      service_id: targetServiceId,
+      status: 'waiting',
+      desk_id: null,
+      desk_number: null,
+      staff_name: null,
+      called_at: null,
+      started_at: null,
+      completed_at: null,
+    })
+    .eq('id', ticketId)
+    .select()
+    .single();
+
+  if (error || !updated) {
+    throw new Error(`Failed to transfer ticket ${ticketId}: ${error?.message}`);
+  }
+
+  await supabase.from('queue_events').insert({
+    ticket_id: ticketId,
+    event_type: 'TRANSFER_TICKET',
+    new_status: 'waiting',
+    actor_name: actorName,
+    metadata: { target_service_id: targetServiceId },
+  });
+
+  return updated;
+}
+
