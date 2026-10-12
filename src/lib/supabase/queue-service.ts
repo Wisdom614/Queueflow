@@ -38,29 +38,43 @@ export interface DbTicketRow {
 }
 
 /**
- * Fetch the initial organization, facility, services, and desks from Supabase.
+ * Fetch the organization, facility, services, and desks from Supabase with multi-tenant resolution.
  */
-export async function getFacilityInitialData(slug: string = 'ubuea') {
+export async function getFacilityInitialData(orgSlug: string = 'ubuea', facilitySlug?: string) {
   const supabase = createServerClient();
 
   const { data: org, error: orgErr } = await supabase
     .from('organizations')
     .select('*')
-    .eq('slug', slug)
+    .eq('slug', orgSlug)
     .single();
 
   if (orgErr || !org) {
-    throw new Error(`Organization ${slug} not found: ${orgErr?.message}`);
+    throw new Error(`Organization ${orgSlug} not found: ${orgErr?.message}`);
   }
 
-  const { data: facility, error: facErr } = await supabase
+  const { data: facilities, error: facErr } = await supabase
     .from('facilities')
     .select('*')
     .eq('org_id', org.id)
-    .single();
+    .order('created_at', { ascending: true });
 
-  if (facErr || !facility) {
+  if (facErr || !facilities || facilities.length === 0) {
     throw new Error(`Facility not found for organization ${org.name}`);
+  }
+
+  // Resolve matching facility or fall back to primary
+  let facility = facilities[0];
+  if (facilitySlug) {
+    const matched = facilities.find(
+      (f) =>
+        f.slug === facilitySlug ||
+        f.name.toLowerCase().replace(/\s+/g, '-') === facilitySlug.toLowerCase() ||
+        f.name.toLowerCase().includes(facilitySlug.toLowerCase().replace(/-/g, ' '))
+    );
+    if (matched) {
+      facility = matched;
+    }
   }
 
   const { data: services, error: srvErr } = await supabase
@@ -112,7 +126,7 @@ export async function getFacilityInitialData(slug: string = 'ubuea') {
       id: facility.id,
       orgId: facility.org_id,
       name: facility.name,
-      slug: facility.name.toLowerCase().replace(/\s+/g, '-'),
+      slug: (facility as { slug?: string }).slug || facility.name.toLowerCase().replace(/\s+/g, '-'),
       location: facility.location,
     } as Facility,
     services: formattedServices,
@@ -168,15 +182,23 @@ export async function dbJoinQueue(
 ): Promise<Ticket> {
   const supabase = createServerClient();
 
-  // 1. Fetch service prefix
+  // 1. Fetch service and verify tenant boundary
   const { data: service, error: srvErr } = await supabase
     .from('services')
-    .select('code_prefix')
+    .select('id, code_prefix, facility_id, is_active')
     .eq('id', serviceId)
     .single();
 
   if (srvErr || !service) {
     throw new Error('Service not found');
+  }
+
+  if (service.facility_id !== facilityId) {
+    throw new Error('Security Violation: Service does not belong to the specified facility');
+  }
+
+  if (!service.is_active) {
+    throw new Error('Service is currently closed for queuing');
   }
 
   const prefix = service.code_prefix || 'Q';
@@ -240,10 +262,26 @@ export async function dbJoinQueue(
 }
 
 /**
- * Call next ticket atomically using PostgreSQL stored procedure.
+ * Call next ticket atomically using PostgreSQL stored procedure with optional facility boundary check.
  */
-export async function dbCallNext(deskId: string, staffName?: string): Promise<Ticket | null> {
+export async function dbCallNext(
+  deskId: string,
+  staffName?: string,
+  facilityId?: string
+): Promise<Ticket | null> {
   const supabase = createServerClient();
+
+  if (facilityId) {
+    const { data: desk, error: dErr } = await supabase
+      .from('desks')
+      .select('id, facility_id')
+      .eq('id', deskId)
+      .single();
+
+    if (dErr || !desk || desk.facility_id !== facilityId) {
+      throw new Error('Security Violation: Desk does not belong to the specified facility');
+    }
+  }
 
   const { data, error } = await supabase.rpc('call_next_ticket', {
     p_desk_id: deskId,
@@ -275,14 +313,28 @@ export async function dbCallNext(deskId: string, staffName?: string): Promise<Ti
 }
 
 /**
- * Update ticket state transition with audit log.
+ * Update ticket state transition with audit log and tenant isolation check.
  */
 export async function dbUpdateTicketStatus(
   ticketId: string,
   newStatus: 'in_service' | 'completed' | 'no_show' | 'cancelled',
-  actorName?: string
+  actorName?: string,
+  facilityId?: string
 ) {
   const supabase = createServerClient();
+
+  if (facilityId) {
+    const { data: ticket, error: tErr } = await supabase
+      .from('tickets')
+      .select('id, facility_id')
+      .eq('id', ticketId)
+      .single();
+
+    if (tErr || !ticket || ticket.facility_id !== facilityId) {
+      throw new Error('Security Violation: Ticket does not belong to the specified facility');
+    }
+  }
+
   const updatePayload: {
     status: 'in_service' | 'completed' | 'no_show' | 'cancelled';
     started_at?: string;
@@ -314,14 +366,37 @@ export async function dbUpdateTicketStatus(
 }
 
 /**
- * Transfer a ticket to a new service in Supabase, unbinding previous desk and logging event.
+ * Transfer a ticket to a new service in Supabase with tenant boundary validation.
  */
 export async function dbTransferTicket(
   ticketId: string,
   targetServiceId: string,
-  actorName?: string
+  actorName?: string,
+  facilityId?: string
 ) {
   const supabase = createServerClient();
+
+  if (facilityId) {
+    const { data: ticket, error: tErr } = await supabase
+      .from('tickets')
+      .select('id, facility_id')
+      .eq('id', ticketId)
+      .single();
+
+    if (tErr || !ticket || ticket.facility_id !== facilityId) {
+      throw new Error('Security Violation: Ticket does not belong to the specified facility');
+    }
+
+    const { data: targetSrv, error: sErr } = await supabase
+      .from('services')
+      .select('id, facility_id')
+      .eq('id', targetServiceId)
+      .single();
+
+    if (sErr || !targetSrv || targetSrv.facility_id !== facilityId) {
+      throw new Error('Security Violation: Target service does not belong to the specified facility');
+    }
+  }
 
   const { data: updated, error } = await supabase
     .from('tickets')

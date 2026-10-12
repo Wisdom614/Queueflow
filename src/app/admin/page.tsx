@@ -3,8 +3,10 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useQueue } from '@/lib/queue-context';
-import { TicketStatus } from '@/types/queue';
+import { TicketStatus, Service } from '@/types/queue';
 import { AuthGuard } from '@/components/AuthGuard';
+import { QRCodeModal } from '@/components/QRCodeModal';
+import { ServiceConfigModal } from '@/components/ServiceConfigModal';
 
 export default function AdminPage() {
   const {
@@ -17,11 +19,65 @@ export default function AdminPage() {
     cancelTicket,
     skipTicket,
     resetToDefault,
+    addService,
+    updateService,
   } = useQueue();
 
   const [statusFilter, setStatusFilter] = useState<'all' | TicketStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [resetConfirm, setResetConfirm] = useState(false);
+
+  // Modal states for QR Codes & Service Configuration
+  const [qrModal, setQrModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    subtitle: string;
+    url: string;
+    serviceCode?: string;
+  }>({
+    isOpen: false,
+    title: '',
+    subtitle: '',
+    url: '',
+  });
+
+  const [serviceModal, setServiceModal] = useState<{
+    isOpen: boolean;
+    service: Service | null;
+  }>({
+    isOpen: false,
+    service: null,
+  });
+
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://queueflow.app';
+
+  const handleOpenFacilityQR = () => {
+    setQrModal({
+      isOpen: true,
+      title: `${facility.name} — Lobby Portal`,
+      subtitle: 'Scan at entrance to select a service and take a virtual ticket',
+      url: `${origin}/join`,
+    });
+  };
+
+  const handleOpenServiceQR = (service: Service) => {
+    setQrModal({
+      isOpen: true,
+      title: service.name,
+      subtitle: `Direct shortcut queue for ${service.name}`,
+      url: `${origin}/join?service=${service.id}`,
+      serviceCode: service.codePrefix,
+    });
+  };
+
+  const handleSaveService = (data: Omit<Service, 'id' | 'facilityId'>) => {
+    if (serviceModal.service) {
+      updateService(serviceModal.service.id, data);
+    } else {
+      addService(data);
+    }
+    setServiceModal({ isOpen: false, service: null });
+  };
 
   // Computed KPIs
   const totalTickets = tickets.length;
@@ -107,6 +163,15 @@ export default function AdminPage() {
             >
               Lobby Board →
             </Link>
+
+            <button
+              type="button"
+              onClick={handleOpenFacilityQR}
+              className="px-3 py-1.5 border border-[#17201d] bg-white font-mono text-xs font-bold text-[#17201d] hover:bg-[#f3f4f1] transition-colors flex items-center gap-1.5"
+            >
+              <span>Entrance QR</span>
+              <span className="text-[10px] bg-[#17201d] text-[#e9ff6a] px-1 py-0.2">POSTER</span>
+            </button>
 
             {!resetConfirm ? (
               <button
@@ -326,18 +391,31 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Services Health */}
+          {/* Services Health & Configuration */}
           <div className="border-2 border-[#17201d] bg-white p-5 sm:p-6 shadow-[6px_6px_0_#17201d]">
-            <div className="flex items-center justify-between border-b border-[#cfd4cd] pb-3 mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#cfd4cd] pb-3 mb-4 gap-3">
               <div>
                 <span className="font-mono text-[10px] uppercase font-bold text-[#56605b]">
-                  Service Queues
+                  Service Queues & Entry Points
                 </span>
-                <h2 className="text-lg font-bold text-[#17201d]">Queue Health by Service Category</h2>
+                <h2 className="text-lg font-bold text-[#17201d]">Services & QR Configurations</h2>
               </div>
-              <span className="font-mono text-xs px-2 py-0.5 bg-[#f8f8f5] border border-[#cfd4cd] font-semibold">
-                {services.length} Registered Services
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleOpenFacilityQR}
+                  className="px-3 py-1.5 bg-[#17201d] text-[#e9ff6a] font-mono text-xs font-bold hover:bg-[#2c3832] transition-colors flex items-center gap-1.5 shadow-[2px_2px_0_#cfd4cd]"
+                >
+                  <span>Lobby QR</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setServiceModal({ isOpen: true, service: null })}
+                  className="px-3 py-1.5 border border-[#17201d] bg-white text-[#17201d] font-mono text-xs font-bold hover:bg-[#f3f4f1] transition-colors"
+                >
+                  + Add Service
+                </button>
+              </div>
             </div>
 
             <div className="space-y-3">
@@ -350,7 +428,7 @@ export default function AdminPage() {
                 return (
                   <div
                     key={service.id}
-                    className="p-4 border border-[#cfd4cd] bg-[#f8f8f5] flex items-center justify-between"
+                    className="p-4 border border-[#cfd4cd] bg-[#f8f8f5] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                   >
                     <div>
                       <div className="flex items-center gap-2">
@@ -358,19 +436,53 @@ export default function AdminPage() {
                           {service.codePrefix}
                         </span>
                         <span className="font-bold text-sm text-[#17201d]">{service.name}</span>
+                        <span
+                          className={`font-mono text-[10px] uppercase px-1.5 py-0.2 font-bold ${
+                            service.isOpen
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : 'bg-gray-200 text-gray-700 border border-gray-300'
+                          }`}
+                        >
+                          {service.isOpen ? 'Open' : 'Paused'}
+                        </span>
                       </div>
                       <p className="font-mono text-xs text-[#56605b] mt-1">
                         Avg duration: ~{service.avgServiceMinutes} mins • {serviceServed.length} served today
                       </p>
+                      {service.description && (
+                        <p className="text-[11px] text-[#56605b] mt-0.5 line-clamp-1">
+                          {service.description}
+                        </p>
+                      )}
                     </div>
 
-                    <div className="text-right">
-                      <span className="font-mono text-2xl font-black text-[#17201d] block">
-                        {serviceWaiting.length}
-                      </span>
-                      <span className="font-mono text-[10px] uppercase tracking-wider text-[#56605b]">
-                        Waiting
-                      </span>
+                    <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                      <div className="text-right sm:mr-2">
+                        <span className="font-mono text-xl sm:text-2xl font-black text-[#17201d] block">
+                          {serviceWaiting.length}
+                        </span>
+                        <span className="font-mono text-[10px] uppercase tracking-wider text-[#56605b]">
+                          Waiting
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenServiceQR(service)}
+                          className="px-2.5 py-1 bg-white border border-[#17201d] text-[#17201d] font-mono text-xs font-bold hover:bg-[#f3f4f1] transition-colors"
+                          title="Generate QR code for this specific service"
+                        >
+                          QR Code
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setServiceModal({ isOpen: true, service })}
+                          className="px-2.5 py-1 bg-white border border-[#cfd4cd] text-[#56605b] hover:text-[#17201d] hover:border-[#17201d] font-mono text-xs font-bold transition-colors"
+                        >
+                          Edit
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -529,6 +641,27 @@ export default function AdminPage() {
           </div>
         </section>
       </div>
+
+      {/* QR Code Presentation Modal */}
+      <QRCodeModal
+        isOpen={qrModal.isOpen}
+        onClose={() => setQrModal((prev) => ({ ...prev, isOpen: false }))}
+        title={qrModal.title}
+        subtitle={qrModal.subtitle}
+        url={qrModal.url}
+        serviceCode={qrModal.serviceCode}
+        orgName={organization.name}
+        facilityName={facility.name}
+      />
+
+      {/* Service Configuration Modal */}
+      <ServiceConfigModal
+        isOpen={serviceModal.isOpen}
+        onClose={() => setServiceModal({ isOpen: false, service: null })}
+        service={serviceModal.service}
+        onSave={handleSaveService}
+        existingPrefixes={services.map((s) => s.codePrefix)}
+      />
     </main>
   </AuthGuard>
   );

@@ -31,6 +31,15 @@ describe('Queue Engine - Domain Logic Tests', () => {
     it('handles default prefix when empty prefix is provided', () => {
       expect(generateTicketNumber('', [])).toBe('Q101');
     });
+
+    it('handles multi-character prefixes properly', () => {
+      const tickets: Pick<Ticket, 'ticketNumber'>[] = [
+        { ticketNumber: 'SIM101' },
+        { ticketNumber: 'SIM102' },
+      ];
+      expect(generateTicketNumber('SIM', tickets)).toBe('SIM103');
+      expect(generateTicketNumber('MED', [])).toBe('MED101');
+    });
   });
 
   describe('calculateWaitingAhead', () => {

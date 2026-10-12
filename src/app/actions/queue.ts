@@ -12,11 +12,11 @@ import { createServerClient } from '@/lib/supabase/server';
 import { Ticket, Desk } from '@/types/queue';
 
 /**
- * Server action to fetch initial state for the Buea Bursary facility.
+ * Server action to fetch initial state for a specified facility (defaulting to Buea Bursary).
  */
-export async function fetchQueueInitialState() {
+export async function fetchQueueInitialState(orgSlug: string = 'ubuea', facilitySlug?: string) {
   try {
-    const facilityData = await getFacilityInitialData('ubuea');
+    const facilityData = await getFacilityInitialData(orgSlug, facilitySlug);
     const todayTickets = await getFacilityTodayTickets(facilityData.facility.id);
 
     return {
@@ -28,7 +28,7 @@ export async function fetchQueueInitialState() {
     };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Failed to fetch queue initial state from Supabase:', error);
+    console.error(`Failed to fetch queue state for ${orgSlug}/${facilitySlug || 'default'}:`, error);
     return {
       success: false,
       error: message || 'Failed to fetch queue initial state',
@@ -37,16 +37,21 @@ export async function fetchQueueInitialState() {
 }
 
 /**
- * Server action to join a queue atomically.
+ * Server action to join a queue atomically with tenant verification.
  */
 export async function joinQueueAction(
   serviceId: string,
   customerName: string,
-  customerPhone?: string
+  customerPhone?: string,
+  targetFacilityId?: string
 ): Promise<{ success: boolean; ticket?: Ticket; error?: string }> {
   try {
-    const { facility } = await getFacilityInitialData('ubuea');
-    const ticket = await dbJoinQueue(facility.id, serviceId, customerName, customerPhone);
+    let facilityId = targetFacilityId;
+    if (!facilityId) {
+      const { facility } = await getFacilityInitialData('ubuea');
+      facilityId = facility.id;
+    }
+    const ticket = await dbJoinQueue(facilityId, serviceId, customerName, customerPhone);
     return { success: true, ticket };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -56,21 +61,24 @@ export async function joinQueueAction(
 }
 
 /**
- * Server action to call the next waiting ticket for a desk.
+ * Server action to call the next waiting ticket for a desk with tenant isolation.
  */
 export async function callNextAction(
   deskNumber: number,
-  staffName?: string
+  staffName?: string,
+  targetFacilityId?: string,
+  orgSlug: string = 'ubuea'
 ): Promise<{ success: boolean; ticket?: Ticket | null; error?: string }> {
   try {
-    const { desks } = await getFacilityInitialData('ubuea');
-    const desk = desks.find((d) => d.number === deskNumber);
+    const { desks, facility } = await getFacilityInitialData(orgSlug);
+    const activeFacilityId = targetFacilityId || facility.id;
+    const desk = desks.find((d) => d.number === deskNumber && d.facilityId === activeFacilityId);
 
     if (!desk) {
-      return { success: false, error: `Desk ${deskNumber} not found` };
+      return { success: false, error: `Desk ${deskNumber} not found for facility ${activeFacilityId}` };
     }
 
-    const ticket = await dbCallNext(desk.id, staffName || desk.activeStaffName);
+    const ticket = await dbCallNext(desk.id, staffName || desk.activeStaffName, activeFacilityId);
     return { success: true, ticket };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -80,15 +88,16 @@ export async function callNextAction(
 }
 
 /**
- * Server action to transition ticket status (in_service, completed, no_show, cancelled).
+ * Server action to transition ticket status with tenant verification.
  */
 export async function updateTicketStatusAction(
   ticketId: string,
   newStatus: 'in_service' | 'completed' | 'no_show' | 'cancelled',
-  actorName?: string
+  actorName?: string,
+  facilityId?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    await dbUpdateTicketStatus(ticketId, newStatus, actorName);
+    await dbUpdateTicketStatus(ticketId, newStatus, actorName, facilityId);
     return { success: true };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -98,19 +107,25 @@ export async function updateTicketStatusAction(
 }
 
 /**
- * Server action to update desk status (open, break, closed).
+ * Server action to update desk status scoped to the specific facility.
  */
 export async function updateDeskStatusAction(
   deskNumber: number,
-  status: Desk['status']
+  status: Desk['status'],
+  facilityId?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = createServerClient();
-    const { error } = await supabase
+    let query = supabase
       .from('desks')
       .update({ status: status === 'break' ? 'paused' : status })
       .eq('number', deskNumber);
 
+    if (facilityId) {
+      query = query.eq('facility_id', facilityId);
+    }
+
+    const { error } = await query;
     if (error) throw error;
     return { success: true };
   } catch (error: unknown) {
@@ -121,15 +136,16 @@ export async function updateDeskStatusAction(
 }
 
 /**
- * Server action to transfer a ticket to a new service.
+ * Server action to transfer a ticket to a new service within the same facility.
  */
 export async function transferTicketAction(
   ticketId: string,
   targetServiceId: string,
-  actorName?: string
+  actorName?: string,
+  facilityId?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    await dbTransferTicket(ticketId, targetServiceId, actorName);
+    await dbTransferTicket(ticketId, targetServiceId, actorName, facilityId);
     return { success: true };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';

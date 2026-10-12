@@ -1,13 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueue } from '@/lib/queue-context';
 import Link from 'next/link';
 import Image from 'next/image';
 
-export default function JoinQueuePage() {
+function JoinQueueForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const serviceParam = searchParams.get('service');
+
   const { organization, facility, services, tickets, joinQueue } = useQueue();
 
   const [selectedServiceId, setSelectedServiceId] = useState<string>(services[0]?.id || '');
@@ -15,6 +18,15 @@ export default function JoinQueuePage() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [existingTicketInput, setExistingTicketInput] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  // If URL has ?service=srv-xyz, preselect that service
+  useEffect(() => {
+    if (serviceParam && services.some((s) => s.id === serviceParam)) {
+      setSelectedServiceId(serviceParam);
+    } else if (!selectedServiceId && services.length > 0) {
+      setSelectedServiceId(services[0].id);
+    }
+  }, [serviceParam, services, selectedServiceId]);
 
   const selectedService = services.find((s) => s.id === selectedServiceId);
 
@@ -26,6 +38,11 @@ export default function JoinQueuePage() {
     }
     if (!selectedServiceId) {
       setError('Please select a service.');
+      return;
+    }
+
+    if (selectedService && !selectedService.isOpen) {
+      setError('This service is currently closed. Please select another service.');
       return;
     }
 
@@ -86,12 +103,15 @@ export default function JoinQueuePage() {
                   <button
                     key={service.id}
                     type="button"
+                    disabled={!service.isOpen}
                     onClick={() => {
                       setSelectedServiceId(service.id);
                       setError(null);
                     }}
                     className={`w-full text-left p-4 border transition-all ${
-                      isSelected
+                      !service.isOpen
+                        ? 'opacity-50 border-dashed border-[#cfd4cd] bg-gray-50 cursor-not-allowed'
+                        : isSelected
                         ? 'border-[#17201d] bg-[#f8f8f5] shadow-[3px_3px_0_#17201d]'
                         : 'border-[#cfd4cd] hover:border-[#17201d] bg-white'
                     }`}
@@ -105,6 +125,11 @@ export default function JoinQueuePage() {
                           <span className="font-semibold text-sm sm:text-base text-[#17201d]">
                             {service.name}
                           </span>
+                          {!service.isOpen && (
+                            <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 bg-gray-200 text-gray-700">
+                              Closed
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-[#56605b] mt-1.5 leading-relaxed">
                           {service.description}
@@ -175,7 +200,7 @@ export default function JoinQueuePage() {
                 className="w-full h-12 bg-[#17201d] text-[#e9ff6a] font-bold text-sm tracking-wide uppercase hover:bg-[#2e3b35] transition-colors flex items-center justify-center gap-2 shadow-[4px_4px_0_#cfd4cd]"
               >
                 <span>Take Virtual Ticket</span>
-                <span className="font-mono text-xs">[{selectedService?.codePrefix}]</span>
+                <span className="font-mono text-xs">[{selectedService?.codePrefix || 'Q'}]</span>
               </button>
             </div>
           </form>
@@ -263,5 +288,13 @@ export default function JoinQueuePage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function JoinQueuePage() {
+  return (
+    <Suspense fallback={<div className="p-12 text-center font-mono text-xs">Loading queue interface...</div>}>
+      <JoinQueueForm />
+    </Suspense>
   );
 }

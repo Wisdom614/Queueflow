@@ -44,6 +44,9 @@ interface QueueContextType {
   getWaitingAheadCount: (ticket: Ticket) => number;
   getEstimatedWaitMinutes: (ticket: Ticket) => number;
   updateDeskStatus: (deskNumber: number, status: 'open' | 'closed' | 'break') => void;
+  addService: (data: Omit<Service, 'id' | 'facilityId'>) => Service;
+  updateService: (serviceId: string, updates: Partial<Service>) => void;
+  deleteService: (serviceId: string) => void;
   resetToDefault: () => void;
 }
 
@@ -55,11 +58,13 @@ const CHANNEL_NAME = 'queueflow_channel';
 interface StoredState {
   tickets: Ticket[];
   desks: Desk[];
+  services: Service[];
 }
 
 const defaultState: StoredState = {
   tickets: initialTickets,
   desks: initialDesks,
+  services: initialServices,
 };
 
 let memoryState: StoredState = defaultState;
@@ -80,7 +85,11 @@ function initStorageOnce() {
     if (saved) {
       const parsed = JSON.parse(saved) as StoredState;
       if (parsed.tickets && parsed.desks) {
-        memoryState = parsed;
+        memoryState = {
+          tickets: parsed.tickets,
+          desks: parsed.desks,
+          services: parsed.services && parsed.services.length > 0 ? parsed.services : initialServices,
+        };
       }
     }
   } catch {
@@ -107,7 +116,12 @@ function subscribe(callback: () => void) {
   const handleStorage = (e: StorageEvent) => {
     if (e.key === STORAGE_KEY && e.newValue) {
       try {
-        memoryState = JSON.parse(e.newValue) as StoredState;
+        const parsed = JSON.parse(e.newValue) as StoredState;
+        memoryState = {
+          tickets: parsed.tickets,
+          desks: parsed.desks,
+          services: parsed.services || initialServices,
+        };
         notify();
       } catch {
         // ignore
@@ -120,7 +134,11 @@ function subscribe(callback: () => void) {
     channel = new BroadcastChannel(CHANNEL_NAME);
     channel.onmessage = (event) => {
       if (event.data?.type === 'SYNC') {
-        memoryState = { tickets: event.data.tickets, desks: event.data.desks };
+        memoryState = {
+          tickets: event.data.tickets,
+          desks: event.data.desks,
+          services: event.data.services || memoryState.services,
+        };
         notify();
       }
     };
@@ -137,8 +155,12 @@ function subscribe(callback: () => void) {
   };
 }
 
-function writeState(newTickets: Ticket[], newDesks: Desk[]) {
-  memoryState = { tickets: newTickets, desks: newDesks };
+function writeState(
+  newTickets: Ticket[],
+  newDesks: Desk[],
+  newServices: Service[] = memoryState.services
+) {
+  memoryState = { tickets: newTickets, desks: newDesks, services: newServices };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(memoryState));
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -156,6 +178,7 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
   const state = useSyncExternalStore(subscribe, getStoredSnapshot, getServerSnapshot);
   const tickets = state.tickets;
   const desks = state.desks;
+  const services = state.services || initialServices;
 
   // Sync with Supabase on mount and establish real-time listening
   useEffect(() => {
@@ -208,9 +231,12 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const getService = useCallback((serviceId: string) => {
-    return initialServices.find((s) => s.id === serviceId);
-  }, []);
+  const getService = useCallback(
+    (serviceId: string) => {
+      return services.find((s) => s.id === serviceId);
+    },
+    [services]
+  );
 
   const getTicket = useCallback(
     (ticketId: string) => {
@@ -377,13 +403,52 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
     [desks, tickets]
   );
 
+  const addService = useCallback(
+    (data: Omit<Service, 'id' | 'facilityId'>) => {
+      const newService: Service = {
+        ...data,
+        id: `srv-${Date.now().toString().slice(-6)}`,
+        facilityId: initialFacility.id,
+      };
+      const updatedServices = [...services, newService];
+      // Automatically associate the new service with open desks so counters can call tickets
+      const updatedDesks = desks.map((d) => ({
+        ...d,
+        supportedServiceIds: d.supportedServiceIds.includes(newService.id)
+          ? d.supportedServiceIds
+          : [...d.supportedServiceIds, newService.id],
+      }));
+      writeState(tickets, updatedDesks, updatedServices);
+      return newService;
+    },
+    [desks, services, tickets]
+  );
+
+  const updateService = useCallback(
+    (serviceId: string, updates: Partial<Service>) => {
+      const updatedServices = services.map((s) =>
+        s.id === serviceId ? { ...s, ...updates } : s
+      );
+      writeState(tickets, desks, updatedServices);
+    },
+    [desks, services, tickets]
+  );
+
+  const deleteService = useCallback(
+    (serviceId: string) => {
+      const updatedServices = services.filter((s) => s.id !== serviceId);
+      writeState(tickets, desks, updatedServices);
+    },
+    [desks, services, tickets]
+  );
+
   const resetToDefault = useCallback(() => {
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {
       // ignore
     }
-    writeState(initialTickets, initialDesks);
+    writeState(initialTickets, initialDesks, initialServices);
   }, []);
 
   return (
@@ -391,7 +456,7 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
       value={{
         organization: initialOrganization,
         facility: initialFacility,
-        services: initialServices,
+        services,
         desks,
         tickets,
         joinQueue,
@@ -406,6 +471,9 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
         getWaitingAheadCount,
         getEstimatedWaitMinutes,
         updateDeskStatus,
+        addService,
+        updateService,
+        deleteService,
         resetToDefault,
       }}
     >
