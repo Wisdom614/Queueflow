@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useSyncExternalStore, useCallback } from 'react';
+import React, { createContext, useContext, useSyncExternalStore, useCallback, useEffect } from 'react';
 import { Ticket, Service, Desk, Organization, Facility, TicketStatus } from '@/types/queue';
 import {
   initialOrganization,
@@ -15,6 +15,14 @@ import {
   calculateEstimatedWaitMinutes,
   processCallNext,
 } from './queue-engine';
+import { supabase } from './supabase/client';
+import {
+  fetchQueueInitialState,
+  joinQueueAction,
+  callNextAction,
+  updateTicketStatusAction,
+  updateDeskStatusAction,
+} from '@/app/actions/queue';
 
 interface QueueContextType {
   organization: Organization;
@@ -146,6 +154,57 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
   const tickets = state.tickets;
   const desks = state.desks;
 
+  // Sync with Supabase on mount and establish real-time listening
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadRemoteState() {
+      try {
+        const res = await fetchQueueInitialState();
+        if (isMounted && res.success && res.data) {
+          // If Supabase has today tickets, merge or write
+          if (res.data.tickets && res.data.tickets.length > 0) {
+            writeState(res.data.tickets, res.data.desks.length > 0 ? res.data.desks : memoryState.desks);
+          }
+        }
+      } catch (err) {
+        console.warn('Initial Supabase fetch skipped or offline, using cache:', err);
+      }
+    }
+
+    loadRemoteState();
+
+    // Supabase Realtime channel
+    const channel = supabase
+      .channel('queueflow_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tickets' },
+        async () => {
+          const res = await fetchQueueInitialState();
+          if (res.success && res.data && res.data.tickets) {
+            writeState(res.data.tickets, memoryState.desks);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'desks' },
+        async () => {
+          const res = await fetchQueueInitialState();
+          if (res.success && res.data && res.data.desks) {
+            writeState(memoryState.tickets, res.data.desks);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const getService = useCallback((serviceId: string) => {
     return initialServices.find((s) => s.id === serviceId);
   }, []);
@@ -201,6 +260,12 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
 
       const updated = [...tickets, newTicket];
       writeState(updated, desks);
+
+      // Async persist in Supabase
+      joinQueueAction(serviceId, customerName, customerPhone).catch((err) => {
+        console.warn('Background Supabase joinQueue failed:', err);
+      });
+
       return newTicket;
     },
     [desks, getService, tickets]
@@ -212,6 +277,12 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
       if (calledTicket || updatedTickets !== tickets) {
         writeState(updatedTickets, desks);
       }
+
+      // Async call in Supabase
+      callNextAction(deskNumber).catch((err) => {
+        console.warn('Background Supabase callNext failed:', err);
+      });
+
       return calledTicket;
     },
     [desks, tickets]
@@ -225,6 +296,9 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
           : t
       );
       writeState(updated, desks);
+      updateTicketStatusAction(ticketId, 'in_service').catch((err) => {
+        console.warn('Background Supabase startService failed:', err);
+      });
     },
     [desks, tickets]
   );
@@ -237,6 +311,9 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
           : t
       );
       writeState(updated, desks);
+      updateTicketStatusAction(ticketId, 'completed').catch((err) => {
+        console.warn('Background Supabase completeService failed:', err);
+      });
     },
     [desks, tickets]
   );
@@ -247,6 +324,9 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
         t.id === ticketId ? { ...t, status: 'no_show' as TicketStatus } : t
       );
       writeState(updated, desks);
+      updateTicketStatusAction(ticketId, 'no_show').catch((err) => {
+        console.warn('Background Supabase skipTicket failed:', err);
+      });
     },
     [desks, tickets]
   );
@@ -257,6 +337,9 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
         t.id === ticketId ? { ...t, status: 'cancelled' as TicketStatus } : t
       );
       writeState(updated, desks);
+      updateTicketStatusAction(ticketId, 'cancelled').catch((err) => {
+        console.warn('Background Supabase cancelTicket failed:', err);
+      });
     },
     [desks, tickets]
   );
@@ -267,6 +350,9 @@ export function QueueProvider({ children }: { children: React.ReactNode }) {
         d.number === deskNumber ? { ...d, status } : d
       );
       writeState(tickets, updatedDesks);
+      updateDeskStatusAction(deskNumber, status).catch((err) => {
+        console.warn('Background Supabase updateDeskStatus failed:', err);
+      });
     },
     [desks, tickets]
   );
