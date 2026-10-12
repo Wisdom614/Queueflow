@@ -1,68 +1,131 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 
+interface TenantDemoCard {
+  id: string;
+  name: string;
+  sector: string;
+  badge: string;
+  tagline: string;
+  orgSlug: string;
+  facilitySlug: string;
+  facilityName: string;
+  services: string[];
+  metrics: { activeQueue: number; avgWait: string; openDesks: number };
+}
+
+const DEMO_TENANTS: TenantDemoCard[] = [
+  {
+    id: 'ubuea',
+    name: 'University of Buea',
+    sector: 'Higher Education',
+    badge: 'Academic Preset',
+    tagline: 'Student fees, clearance, admissions, and ID card card operations.',
+    orgSlug: 'ubuea',
+    facilitySlug: 'central-bursary',
+    facilityName: 'Central Bursary Complex',
+    services: ['Tuition Fee Cashier (B)', 'Transcript Clearance (T)', 'Student Card Issuance (C)'],
+    metrics: { activeQueue: 4, avgWait: '14 min', openDesks: 3 },
+  },
+  {
+    id: 'sample-telecom',
+    name: 'Metropolitan Telecom',
+    sector: 'Telecommunications',
+    badge: 'Telecom Preset',
+    tagline: 'High-volume SIM registration, hardware repairs, and billing support.',
+    orgSlug: 'sample-telecom',
+    facilitySlug: 'downtown-hub',
+    facilityName: 'Downtown Service Center',
+    services: ['SIM Card & eSIM Setup (S)', 'Billing & Account Services (A)', 'Technical Device Support (T)'],
+    metrics: { activeQueue: 2, avgWait: '10 min', openDesks: 3 },
+  },
+  {
+    id: 'sample-clinic',
+    name: 'St. Jude Community Health',
+    sector: 'Healthcare & Clinics',
+    badge: 'Clinical Preset',
+    tagline: 'Outpatient patient intake, medical consultations, and dispensary.',
+    orgSlug: 'sample-clinic',
+    facilitySlug: 'outpatient-center',
+    facilityName: 'Main Outpatient Clinic',
+    services: ['Triage & Vital Signs (T)', 'General Consultation (C)', 'Laboratory & Diagnostics (L)', 'Dispensary & Pharmacy (P)'],
+    metrics: { activeQueue: 2, avgWait: '18 min', openDesks: 3 },
+  },
+  {
+    id: 'sample-bank',
+    name: 'Apex Commercial Bank',
+    sector: 'Retail Banking',
+    badge: 'Financial Preset',
+    tagline: 'Teller cash transactions, foreign exchange, and corporate accounts.',
+    orgSlug: 'sample-bank',
+    facilitySlug: 'main-branch',
+    facilityName: 'Corporate Banking Branch',
+    services: ['Cash Deposits & Withdrawals (C)', 'Account Operations (A)', 'Foreign Exchange (F)', 'Loan Consultation (L)'],
+    metrics: { activeQueue: 2, avgWait: '12 min', openDesks: 4 },
+  },
+];
+
 export default function Home() {
-  const industries = [
-    {
-      name: 'Higher Education',
-      example: 'Bursaries, Admissions, Registrar & ID Cards',
-      prefix: 'EDU',
-    },
-    {
-      name: 'Healthcare & Clinics',
-      example: 'Outpatient Triage, Consultations & Pharmacy',
-      prefix: 'MED',
-    },
-    {
-      name: 'Telecom & Banking',
-      example: 'SIM Replacements, Account Desk & Cashiers',
-      prefix: 'FIN',
-    },
-    {
-      name: 'Civic & Government',
-      example: 'Passport Services, Civil Registry & Licensing',
-      prefix: 'GOV',
-    },
-  ];
+  const [activeTenantId, setActiveTenantId] = useState<string>('ubuea');
+  const activeTenant = DEMO_TENANTS.find((t) => t.id === activeTenantId) || DEMO_TENANTS[0];
 
   return (
     <main className="min-h-screen bg-[#f8f8f5] text-[#17201d]">
-      {/* Hero Section */}
-      <section className="mx-auto max-w-7xl px-4 sm:px-8 py-10 sm:py-20">
-        <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-10 lg:gap-16 items-center">
-          {/* Left: Focused Value Proposition */}
+      {/* Platform Hero */}
+      <section className="mx-auto max-w-7xl px-4 sm:px-8 py-10 sm:py-16">
+        <div className="grid lg:grid-cols-[1.15fr_0.85fr] gap-10 lg:gap-14 items-center">
+          {/* Left: Headline & Product Overview */}
           <div className="space-y-6">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-[#17201d] leading-[1.05]">
-              Join the queue without standing in it.
+            <div className="inline-flex items-center gap-2 border border-[#17201d] bg-white px-3 py-1 text-xs font-mono font-bold tracking-wider uppercase text-[#17201d]">
+              <span className="size-2 bg-[#17201d] animate-pulse" />
+              Multi-Organization Queue Management SaaS
+            </div>
+
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#17201d] leading-[1.05]">
+              One platform. Every physical queue.
             </h1>
 
             <p className="text-base sm:text-lg text-[#56605b] max-w-xl leading-relaxed">
-              A configurable, real-time queuing platform connecting customers, service desks, and public displays. Zero physical lines. No accounts required.
+              QueueFlow enables universities, clinics, telecom offices, and financial branches to configure multiple facilities, service desks, and queue rules with complete data isolation.
             </p>
 
-            {/* Essential CTAs */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            {/* Quick Actions */}
+            <div className="flex flex-wrap gap-3 pt-2">
               <Link
-                href="/join"
+                href={`/${activeTenant.orgSlug}/${activeTenant.facilitySlug}`}
                 className="h-12 px-6 bg-[#17201d] text-[#e9ff6a] font-bold text-sm uppercase tracking-wider hover:bg-[#2c3832] transition-colors flex items-center justify-center gap-2 shadow-[4px_4px_0_#17201d]"
               >
-                <span>Join a Queue</span>
+                <span>Launch Demo: {activeTenant.name}</span>
                 <span className="font-mono text-sm">→</span>
               </Link>
 
               <Link
-                href="/staff"
+                href={`/${activeTenant.orgSlug}/admin`}
                 className="h-12 px-6 bg-white border border-[#17201d] text-[#17201d] font-semibold text-sm hover:bg-[#f3f4f1] transition-colors flex items-center justify-center"
               >
-                Staff Console
+                Tenant Admin Console
               </Link>
+            </div>
+
+            <div className="flex items-center gap-6 pt-2 text-xs font-mono text-[#56605b]">
+              <div>
+                <span className="font-bold text-[#17201d]">Zero</span> app install needed
+              </div>
+              <div className="h-3 w-px bg-[#cfd4cd]" />
+              <div>
+                <span className="font-bold text-[#17201d]">Instant</span> QR code check-in
+              </div>
+              <div className="h-3 w-px bg-[#cfd4cd]" />
+              <div>
+                <span className="font-bold text-[#17201d]">Realtime</span> Supabase sync
+              </div>
             </div>
           </div>
 
-          {/* Right: Clean Editorial Visual */}
+          {/* Right: Live Digital Pass Card */}
           <div className="relative mx-auto w-full max-w-md lg:max-w-none">
             <div className="relative border-2 border-[#17201d] bg-white shadow-[8px_8px_0_#17201d] overflow-hidden">
               <Image
@@ -71,22 +134,202 @@ export default function Home() {
                 width={800}
                 height={500}
                 priority
-                className="w-full h-64 sm:h-80 object-cover"
+                className="w-full h-60 sm:h-72 object-cover"
               />
-              <div className="p-4 bg-white border-t-2 border-[#17201d] flex items-center justify-between">
-                <div>
-                  <span className="font-mono text-[10px] uppercase text-[#56605b] block">
-                    Live Digital Pass
+              <div className="p-4 bg-white border-t-2 border-[#17201d]">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-mono text-[10px] uppercase text-[#56605b] block">
+                      Live Dynamic Ticket Flow
+                    </span>
+                    <span className="font-mono text-2xl font-black text-[#17201d]">
+                      Pass B284 &bull; Counter 02
+                    </span>
+                  </div>
+                  <Link
+                    href={`/${activeTenant.orgSlug}/${activeTenant.facilitySlug}/ticket/B284`}
+                    className="px-3.5 py-1.5 bg-[#17201d] text-[#e9ff6a] font-mono text-xs font-bold uppercase hover:bg-[#2c3832] transition-colors"
+                  >
+                    View Pass →
+                  </Link>
+                </div>
+                <div className="mt-3 flex items-center justify-between text-[11px] font-mono text-[#56605b] border-t border-[#f0f0ed] pt-2">
+                  <span>Facility: {activeTenant.facilityName}</span>
+                  <span className="text-[#17201d] font-bold">Estimated 6m</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Multi-Tenant Demo Switcher & Directory */}
+      <section className="border-y border-[#cfd4cd] bg-white py-12 sm:py-16 px-4 sm:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#cfd4cd] pb-6 mb-8">
+            <div>
+              <span className="font-mono text-[11px] uppercase tracking-wider text-[#56605b]">
+                Interactive Tenant Directory
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-[#17201d] mt-1">
+                Explore Pre-Configured Multi-Tenant Workspaces
+              </h2>
+            </div>
+            <p className="text-xs text-[#56605b] max-w-md">
+              QueueFlow isolates configuration, tickets, and real-time broadcasts per facility. Select an organization preset below to test customer, staff, and display flows.
+            </p>
+          </div>
+
+          {/* Tenant Selector Tabs */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+            {DEMO_TENANTS.map((tenant) => {
+              const isSelected = tenant.id === activeTenantId;
+              return (
+                <button
+                  key={tenant.id}
+                  onClick={() => setActiveTenantId(tenant.id)}
+                  className={`text-left p-4 border-2 transition-all ${
+                    isSelected
+                      ? 'border-[#17201d] bg-[#f8f8f5] shadow-[4px_4px_0_#17201d]'
+                      : 'border-[#cfd4cd] bg-white hover:border-[#17201d]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[10px] font-bold uppercase px-1.5 py-0.5 bg-[#17201d] text-[#e9ff6a]">
+                      {tenant.badge}
+                    </span>
+                    {isSelected && (
+                      <span className="size-2 bg-[#17201d] rounded-full" />
+                    )}
+                  </div>
+                  <h3 className="font-bold text-sm text-[#17201d] mt-2.5 truncate">
+                    {tenant.name}
+                  </h3>
+                  <p className="text-[11px] text-[#56605b] mt-0.5 font-mono truncate">
+                    /{tenant.orgSlug}/{tenant.facilitySlug}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Active Tenant Showcase Pane */}
+          <div className="border-2 border-[#17201d] bg-[#f8f8f5] p-6 sm:p-8">
+            <div className="grid lg:grid-cols-12 gap-8 items-start">
+              {/* Left Column: Organization Details */}
+              <div className="lg:col-span-7 space-y-4">
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-xs uppercase px-2 py-0.5 bg-[#17201d] text-white font-bold">
+                    {activeTenant.sector}
                   </span>
-                  <span className="font-mono text-xl sm:text-2xl font-black text-[#17201d]">
-                    Ticket B284
+                  <span className="font-mono text-xs text-[#56605b]">
+                    Scoped Facility: <strong className="text-[#17201d]">{activeTenant.facilityName}</strong>
                   </span>
                 </div>
+
+                <h3 className="text-2xl sm:text-3xl font-black text-[#17201d]">
+                  {activeTenant.name}
+                </h3>
+                <p className="text-sm text-[#56605b] leading-relaxed">
+                  {activeTenant.tagline}
+                </p>
+
+                {/* Configured Services List */}
+                <div className="pt-2">
+                  <span className="font-mono text-[11px] font-bold uppercase text-[#56605b] block mb-2">
+                    Configured Services & Ticket Prefixes:
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {activeTenant.services.map((srv) => (
+                      <span
+                        key={srv}
+                        className="font-mono text-xs px-2.5 py-1 border border-[#cfd4cd] bg-white text-[#17201d]"
+                      >
+                        {srv}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Live Stats */}
+                <div className="grid grid-cols-3 gap-3 pt-3 border-t border-[#cfd4cd]">
+                  <div className="p-3 bg-white border border-[#cfd4cd]">
+                    <span className="font-mono text-[10px] text-[#56605b] block">In Queue</span>
+                    <span className="font-mono text-xl font-bold text-[#17201d]">
+                      {activeTenant.metrics.activeQueue} tickets
+                    </span>
+                  </div>
+                  <div className="p-3 bg-white border border-[#cfd4cd]">
+                    <span className="font-mono text-[10px] text-[#56605b] block">Est. Wait</span>
+                    <span className="font-mono text-xl font-bold text-[#17201d]">
+                      {activeTenant.metrics.avgWait}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-white border border-[#cfd4cd]">
+                    <span className="font-mono text-[10px] text-[#56605b] block">Active Desks</span>
+                    <span className="font-mono text-xl font-bold text-[#17201d]">
+                      {activeTenant.metrics.openDesks} counters
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Dynamic Deep-Links */}
+              <div className="lg:col-span-5 space-y-3">
+                <span className="font-mono text-[11px] font-bold uppercase text-[#56605b] block">
+                  Launch Interface For This Facility:
+                </span>
+
                 <Link
-                  href="/ticket/B284"
-                  className="px-3 py-1.5 bg-[#17201d] text-[#e9ff6a] font-mono text-xs font-bold uppercase hover:bg-[#2c3832] transition-colors"
+                  href={`/${activeTenant.orgSlug}/${activeTenant.facilitySlug}`}
+                  className="flex items-center justify-between p-3.5 border-2 border-[#17201d] bg-white hover:bg-[#e9ff6a] transition-all group"
                 >
-                  View Sample Pass →
+                  <div>
+                    <span className="font-mono text-[10px] font-bold uppercase text-[#56605b] group-hover:text-[#17201d] block">
+                      Customer Entry Point
+                    </span>
+                    <strong className="text-sm text-[#17201d]">Mobile Join & Ticket Scanner</strong>
+                  </div>
+                  <span className="font-mono text-xs font-bold text-[#17201d]">/{activeTenant.orgSlug}/{activeTenant.facilitySlug} →</span>
+                </Link>
+
+                <Link
+                  href={`/${activeTenant.orgSlug}/${activeTenant.facilitySlug}/staff`}
+                  className="flex items-center justify-between p-3.5 border border-[#17201d] bg-white hover:bg-[#17201d] hover:text-white transition-all group"
+                >
+                  <div>
+                    <span className="font-mono text-[10px] font-bold uppercase text-[#56605b] group-hover:text-[#aeb9b1] block">
+                      Staff Station
+                    </span>
+                    <strong className="text-sm group-hover:text-white text-[#17201d]">Counter Calling Console</strong>
+                  </div>
+                  <span className="font-mono text-xs font-bold">/staff →</span>
+                </Link>
+
+                <Link
+                  href={`/${activeTenant.orgSlug}/${activeTenant.facilitySlug}/display`}
+                  className="flex items-center justify-between p-3.5 border border-[#17201d] bg-[#17201d] text-white hover:border-[#e9ff6a] transition-all"
+                >
+                  <div>
+                    <span className="font-mono text-[10px] font-bold uppercase text-[#e9ff6a] block">
+                      Lobby Hardware Screen
+                    </span>
+                    <strong className="text-sm text-white">Full-Screen Arrival Board</strong>
+                  </div>
+                  <span className="font-mono text-xs font-bold text-[#e9ff6a]">/display →</span>
+                </Link>
+
+                <Link
+                  href={`/${activeTenant.orgSlug}/admin`}
+                  className="flex items-center justify-between p-3.5 border border-[#cfd4cd] bg-white hover:border-[#17201d] transition-all"
+                >
+                  <div>
+                    <span className="font-mono text-[10px] font-bold uppercase text-[#56605b] block">
+                      Facility Administration
+                    </span>
+                    <strong className="text-sm text-[#17201d]">Config, QR Posters & Analytics</strong>
+                  </div>
+                  <span className="font-mono text-xs font-bold text-[#17201d]">/admin →</span>
                 </Link>
               </div>
             </div>
@@ -94,72 +337,27 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Multi-Industry Configurable Section */}
-      <section className="border-y border-[#cfd4cd] bg-white py-12 sm:py-16 px-4 sm:px-8">
-        <div className="mx-auto max-w-7xl">
-          <div className="grid lg:grid-cols-2 gap-8 lg:gap-14 items-center">
-            <div>
-              <span className="font-mono text-[11px] uppercase tracking-wider text-[#56605b] block mb-2">
-                Configurable Architecture
-              </span>
-              <h2 className="text-2xl sm:text-4xl font-bold tracking-tight text-[#17201d] leading-tight">
-                Engineered for any organization with physical queues.
-              </h2>
-              <p className="text-sm text-[#56605b] mt-4 leading-relaxed">
-                QueueFlow adapts to any organization. Administrators configure facilities, services, desks, and queue rules without changing application code.
-              </p>
-
-              <div className="grid grid-cols-2 gap-3 mt-6">
-                {industries.map((ind) => (
-                  <div key={ind.name} className="p-3 border border-[#cfd4cd] bg-[#f8f8f5]">
-                    <span className="font-mono text-[10px] px-1.5 py-0.2 bg-[#17201d] text-[#e9ff6a] font-bold">
-                      {ind.prefix}
-                    </span>
-                    <h4 className="font-semibold text-xs text-[#17201d] mt-1.5">{ind.name}</h4>
-                    <p className="text-[10px] text-[#56605b] mt-0.5 line-clamp-2">{ind.example}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="border-2 border-[#17201d] bg-white shadow-[6px_6px_0_#17201d] overflow-hidden">
-              <Image
-                src="/images/service-center.jpg"
-                alt="Modern service desks with digital display screens in high-traffic center"
-                width={800}
-                height={500}
-                className="w-full h-64 sm:h-80 object-cover"
-              />
-              <div className="p-3 bg-[#17201d] text-white flex items-center justify-between text-xs font-mono">
-                <span className="text-[#e9ff6a]">● Multi-Desk Lobby Operations</span>
-                <span className="text-[#aeb9b1]">Real-time Desk Sync</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* The 3 Core Roles Section */}
+      {/* The 4 Core Interfaces Section */}
       <section className="py-12 sm:py-16 px-4 sm:px-8 bg-[#f8f8f5]">
         <div className="mx-auto max-w-7xl">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 border-b border-[#cfd4cd] pb-4 mb-8">
             <div>
               <span className="font-mono text-[11px] uppercase tracking-wider text-[#56605b]">
-                Platform Interfaces
+                Platform Architecture
               </span>
               <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#17201d] mt-1">
-                Explore the four interfaces
+                Unified Engine, Four Specialized Experiences
               </h2>
             </div>
             <p className="text-xs text-[#56605b] max-w-xs">
-              All interfaces stay in sync through a shared real-time queue engine.
+              Every interface updates in sub-second latency through facility-scoped websocket channels.
             </p>
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {/* Customer Role */}
             <Link
-              href="/join"
+              href={`/${activeTenant.orgSlug}/${activeTenant.facilitySlug}`}
               className="p-5 sm:p-6 border-2 border-[#17201d] bg-white hover:shadow-[6px_6px_0_#17201d] transition-all flex flex-col justify-between group"
             >
               <div>
@@ -170,7 +368,7 @@ export default function Home() {
                   Join & Track
                 </h3>
                 <p className="text-xs text-[#56605b] mt-2 leading-relaxed">
-                  Join instantly from a smartphone. Track queue position, estimated wait time, and receive audio turn alerts.
+                  Join via QR or web. Receive live queue position, estimated wait countdown, and turn vibration alerts.
                 </p>
               </div>
               <span className="mt-5 font-mono text-xs font-bold text-[#17201d] flex items-center gap-1">
@@ -180,7 +378,7 @@ export default function Home() {
 
             {/* Staff Role */}
             <Link
-              href="/staff"
+              href={`/${activeTenant.orgSlug}/${activeTenant.facilitySlug}/staff`}
               className="p-5 sm:p-6 border-2 border-[#17201d] bg-white hover:shadow-[6px_6px_0_#17201d] transition-all flex flex-col justify-between group"
             >
               <div>
@@ -191,7 +389,7 @@ export default function Home() {
                   Staff Station
                 </h3>
                 <p className="text-xs text-[#56605b] mt-2 leading-relaxed">
-                  Streamlined station interface: Call Next, start service, complete, or mark no-shows with one tap.
+                  Fast counter interface: Call Next, initiate service, mark no-show, or transfer ticket to another queue.
                 </p>
               </div>
               <span className="mt-5 font-mono text-xs font-bold text-[#17201d] flex items-center gap-1">
@@ -201,7 +399,7 @@ export default function Home() {
 
             {/* Public Display Role */}
             <Link
-              href="/display"
+              href={`/${activeTenant.orgSlug}/${activeTenant.facilitySlug}/display`}
               className="p-5 sm:p-6 border-2 border-[#17201d] bg-[#17201d] text-white hover:shadow-[6px_6px_0_#cfd4cd] transition-all flex flex-col justify-between group"
             >
               <div>
@@ -212,7 +410,7 @@ export default function Home() {
                   Public Board
                 </h3>
                 <p className="text-xs text-[#aeb9b1] mt-2 leading-relaxed">
-                  High-contrast departure-style board displaying &quot;Now Serving&quot; desks and upcoming queue numbers with sound chimes.
+                  High-contrast departure board showing Now Serving desks and upcoming passes with audio alert chimes.
                 </p>
               </div>
               <span className="mt-5 font-mono text-xs font-bold text-[#e9ff6a] flex items-center gap-1">
@@ -222,7 +420,7 @@ export default function Home() {
 
             {/* Admin & Facility Manager Role */}
             <Link
-              href="/admin"
+              href={`/${activeTenant.orgSlug}/admin`}
               className="p-5 sm:p-6 border-2 border-[#17201d] bg-white hover:shadow-[6px_6px_0_#17201d] transition-all flex flex-col justify-between group"
             >
               <div>
@@ -230,10 +428,10 @@ export default function Home() {
                   04 &bull; Admin
                 </span>
                 <h3 className="text-lg font-bold text-[#17201d] mt-3 group-hover:underline">
-                  Admin & Metrics
+                  Admin & Posters
                 </h3>
                 <p className="text-xs text-[#56605b] mt-2 leading-relaxed">
-                  Live throughput analytics, desk allocation, service configuration, and queue health monitoring.
+                  Add custom services, configure desk assignments, generate printable QR posters, and inspect analytics.
                 </p>
               </div>
               <span className="mt-5 font-mono text-xs font-bold text-[#17201d] flex items-center gap-1">
@@ -248,7 +446,7 @@ export default function Home() {
       <footer className="border-t border-[#cfd4cd] px-4 sm:px-8 py-6 bg-white">
         <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-[#56605b] font-mono">
           <div>
-            <span className="font-bold text-[#17201d]">QueueFlow</span> &bull; Virtual Queue Management Platform
+            <span className="font-bold text-[#17201d]">QueueFlow</span> &bull; Multi-Tenant Virtual Queue Platform
           </div>
           <div>Swiss Editorial &bull; Restrained Neobrutalism</div>
         </div>
