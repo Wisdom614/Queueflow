@@ -43,11 +43,28 @@ export interface DbTicketRow {
 export async function getFacilityInitialData(orgSlug: string = 'ubuea', facilitySlug?: string) {
   const supabase = createServerClient();
 
-  const { data: org, error: orgErr } = await supabase
+  let { data: org, error: orgErr } = await supabase
     .from('organizations')
     .select('*')
     .eq('slug', orgSlug)
     .single();
+
+  if (orgErr || !org) {
+    // If requesting default 'ubuea' but it does not exist in the DB, fallback to the first real registered organization
+    if (orgSlug === 'ubuea') {
+      const { data: firstOrg } = await supabase
+        .from('organizations')
+        .select('*')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (firstOrg) {
+        org = firstOrg;
+        orgErr = null;
+      }
+    }
+  }
 
   if (orgErr || !org) {
     throw new Error(`Organization ${orgSlug} not found: ${orgErr?.message}`);
@@ -427,5 +444,100 @@ export async function dbTransferTicket(
   });
 
   return updated;
+}
+
+/**
+ * Create a new service and attach it to existing desks in the facility.
+ */
+export async function dbCreateService(
+  facilityId: string,
+  serviceData: Omit<Service, 'id' | 'facilityId'>
+): Promise<Service> {
+  const supabase = createServerClient();
+
+  const { data: created, error } = await supabase
+    .from('services')
+    .insert({
+      facility_id: facilityId,
+      name: serviceData.name.trim(),
+      code_prefix: (serviceData.codePrefix || 'A').toUpperCase().trim().slice(0, 4),
+      avg_service_minutes: Math.max(1, Number(serviceData.avgServiceMinutes) || 5),
+      is_active: serviceData.isOpen !== false,
+    })
+    .select()
+    .single();
+
+  if (error || !created) {
+    throw new Error(`Failed to create service: ${error?.message}`);
+  }
+
+  // Auto-associate with all desks in this facility so counters can call this service
+  const { data: facilityDesks } = await supabase
+    .from('desks')
+    .select('id')
+    .eq('facility_id', facilityId);
+
+  if (facilityDesks && facilityDesks.length > 0) {
+    const mappings = facilityDesks.map((d) => ({
+      desk_id: d.id,
+      service_id: created.id,
+    }));
+    try {
+      await supabase.from('desk_services').insert(mappings);
+    } catch {
+      // Ignore conflict or desk mapping failures
+    }
+  }
+
+  return {
+    id: created.id,
+    facilityId: created.facility_id,
+    name: created.name,
+    codePrefix: created.code_prefix,
+    description: serviceData.description || `${created.name} operations`,
+    avgServiceMinutes: created.avg_service_minutes,
+    isOpen: created.is_active,
+  };
+}
+
+/**
+ * Update an existing service in Supabase.
+ */
+export async function dbUpdateService(
+  serviceId: string,
+  updates: Partial<Service>
+): Promise<void> {
+  const supabase = createServerClient();
+
+  const dbPayload: Record<string, unknown> = {};
+  if (updates.name !== undefined) dbPayload.name = updates.name.trim();
+  if (updates.codePrefix !== undefined) dbPayload.code_prefix = updates.codePrefix.toUpperCase().trim().slice(0, 4);
+  if (updates.avgServiceMinutes !== undefined) dbPayload.avg_service_minutes = Math.max(1, Number(updates.avgServiceMinutes));
+  if (updates.isOpen !== undefined) dbPayload.is_active = updates.isOpen;
+
+  const { error } = await supabase
+    .from('services')
+    .update(dbPayload)
+    .eq('id', serviceId);
+
+  if (error) {
+    throw new Error(`Failed to update service ${serviceId}: ${error.message}`);
+  }
+}
+
+/**
+ * Delete a service from Supabase.
+ */
+export async function dbDeleteService(serviceId: string): Promise<void> {
+  const supabase = createServerClient();
+
+  const { error } = await supabase
+    .from('services')
+    .delete()
+    .eq('id', serviceId);
+
+  if (error) {
+    throw new Error(`Failed to delete service ${serviceId}: ${error.message}`);
+  }
 }
 

@@ -5,11 +5,14 @@ import {
   dbCallNext,
   dbUpdateTicketStatus,
   dbTransferTicket,
+  dbCreateService,
+  dbUpdateService,
+  dbDeleteService,
   getFacilityInitialData,
   getFacilityTodayTickets,
 } from '@/lib/supabase/queue-service';
 import { createServerClient } from '@/lib/supabase/server';
-import { Ticket, Desk } from '@/types/queue';
+import { Ticket, Desk, Service } from '@/types/queue';
 
 /**
  * Server action to fetch initial state for a specified facility (defaulting to Buea Bursary).
@@ -147,6 +150,56 @@ export async function transferTicketAction(
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error in transferTicketAction:', error);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Server action to create a new service with database persistence.
+ */
+export async function createServiceAction(
+  facilityId: string,
+  serviceData: Omit<Service, 'id' | 'facilityId'>
+): Promise<{ success: boolean; service?: Service; error?: string }> {
+  try {
+    const service = await dbCreateService(facilityId, serviceData);
+    return { success: true, service };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error in createServiceAction:', error);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Server action to update an existing service in Supabase.
+ */
+export async function updateServiceAction(
+  serviceId: string,
+  updates: Partial<Service>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await dbUpdateService(serviceId, updates);
+    return { success: true };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error in updateServiceAction:', error);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Server action to delete a service from Supabase.
+ */
+export async function deleteServiceAction(
+  serviceId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await dbDeleteService(serviceId);
+    return { success: true };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error in deleteServiceAction:', error);
     return { success: false, error: message };
   }
 }

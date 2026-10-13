@@ -25,6 +25,9 @@ import {
   updateTicketStatusAction,
   updateDeskStatusAction,
   transferTicketAction,
+  createServiceAction,
+  updateServiceAction,
+  deleteServiceAction,
 } from '@/app/actions/queue';
 
 interface QueueContextType {
@@ -436,9 +439,10 @@ export function QueueProvider({
 
   const addService = useCallback(
     (data: Omit<Service, 'id' | 'facilityId'>) => {
+      const tempId = `srv-${Date.now().toString().slice(-6)}`;
       const newService: Service = {
         ...data,
-        id: `srv-${Date.now().toString().slice(-6)}`,
+        id: tempId,
         facilityId: facility.id,
       };
       const updatedServices = [...services, newService];
@@ -450,6 +454,26 @@ export function QueueProvider({
           : [...d.supportedServiceIds, newService.id],
       }));
       writeState(tickets, updatedDesks, updatedServices);
+
+      // Persist directly to Supabase in the background
+      createServiceAction(facility.id, data).then((res) => {
+        if (res.success && res.service) {
+          const persistedId = res.service.id;
+          const reconciledServices = memoryState.services.map((s) =>
+            s.id === tempId ? { ...s, id: persistedId } : s
+          );
+          const reconciledDesks = memoryState.desks.map((d) => ({
+            ...d,
+            supportedServiceIds: d.supportedServiceIds.map((id) =>
+              id === tempId ? persistedId : id
+            ),
+          }));
+          writeState(memoryState.tickets, reconciledDesks, reconciledServices);
+        }
+      }).catch((err) => {
+        console.warn('Background Supabase createService failed:', err);
+      });
+
       return newService;
     },
     [desks, facility.id, services, tickets]
@@ -461,6 +485,9 @@ export function QueueProvider({
         s.id === serviceId ? { ...s, ...updates } : s
       );
       writeState(tickets, desks, updatedServices);
+      updateServiceAction(serviceId, updates).catch((err) => {
+        console.warn('Background Supabase updateService failed:', err);
+      });
     },
     [desks, services, tickets]
   );
@@ -469,6 +496,9 @@ export function QueueProvider({
     (serviceId: string) => {
       const updatedServices = services.filter((s) => s.id !== serviceId);
       writeState(tickets, desks, updatedServices);
+      deleteServiceAction(serviceId).catch((err) => {
+        console.warn('Background Supabase deleteService failed:', err);
+      });
     },
     [desks, services, tickets]
   );
